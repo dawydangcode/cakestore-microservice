@@ -10,6 +10,10 @@ spring:
         locator:
           enabled: true   # T? ??ng ??nh tuy?n các microservice t? Eureka
       routes:
+        - id: homepage-service
+          uri: lb://HOMEPAGE-SERVICE
+          predicates:
+            - Path=/**
         - id: product-service
           uri: lb://PRODUCT-SERVICE
           predicates:
