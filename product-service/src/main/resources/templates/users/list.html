@@ -2,10 +2,37 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>User List From User</title>
+  <title>User List</title>
 </head>
 <body>
 <h1>User List</h1>
-<div th:utext="${userListHtml}"></div>
+<table border="1">
+  <thead>
+  <tr>
+    <th>ID</th>
+    <th>Username</th>
+    <th>Full Name</th>
+    <th>Email</th>
+    <th>Date of Birth</th>
+    <th>Phone</th>
+    <th>Role</th>
+    <th>Created At</th>
+    <th>Updated At</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr th:each="user : ${users}">
+    <td th:text="${user.id}"></td>
+    <td th:text="${user.username}"></td>
+    <td th:text="${user.fullName}"></td>
+    <td th:text="${user.email}"></td>
+    <td th:text="${user.dob}"></td>
+    <td th:text="${user.phone}"></td>
+    <td th:text="${user.role}"></td>
+    <td th:text="${user.createAt}"></td>
+    <td th:text="${user.updateAt}"></td>
+  </tr>
+  </tbody>
+</table>
 </body>
 </html>
