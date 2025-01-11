@@ -1,5 +1,5 @@
 server:
-  port: 8080   # C?ng API Gateway
+  port: 8080  
 
 spring:
   application:
@@ -8,7 +8,7 @@ spring:
     gateway:
       discovery:
         locator:
-          enabled: true   # T? ??ng ??nh tuy?n các microservice t? Eureka
+          enabled: true
       routes:
         - id: homepage-service
           uri: lb://HOMEPAGE-SERVICE
