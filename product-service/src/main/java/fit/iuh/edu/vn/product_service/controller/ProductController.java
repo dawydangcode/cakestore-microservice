@@ -35,13 +35,6 @@ public class ProductController {
     }
 
     @GetMapping("/list")
-    public String getProductList(Model model) {
-        List<Product> products = productRepository.findAll();
-        model.addAttribute("products", products);
-        return "products/list";
-    }
-
-    @GetMapping("/api/list")
     public ResponseEntity<List<Product>> getProductList() {
         List<Product> products = productRepository.findAll();
         return ResponseEntity.ok(products);

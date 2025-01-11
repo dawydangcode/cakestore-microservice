@@ -31,7 +31,7 @@ public class HomepageController {
     @GetMapping("/")
     public String showHomepage(Model model) {
         ServiceInstance serviceInstance = discoveryClient.getInstances("product-service").get(0);
-        String url = serviceInstance.getUri() + "/products/api/list";
+        String url = serviceInstance.getUri() + "/products/list";
         ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
                 url,
                 HttpMethod.GET,
