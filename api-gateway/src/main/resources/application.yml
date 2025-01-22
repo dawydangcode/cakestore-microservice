@@ -10,14 +10,14 @@ spring:
         locator:
           enabled: true
       routes:
-        - id: homepage-service
-          uri: lb://HOMEPAGE-SERVICE
-          predicates:
-            - Path=/**
         - id: product-service
           uri: lb://PRODUCT-SERVICE
           predicates:
             - Path=/products/**
+        - id: cart-service
+          uri: lb://CART-SERVICE
+          predicates:
+            - Path=/carts/**
 
 eureka:
   client:

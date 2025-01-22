@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="JpaBuddyIdeaProjectConfig">
-    <option name="reLastEntityCreationPackage" value="product-service/src/main/java/fit/iuh/edu/vn/product_service/models" />
-    <option name="reverseEngineeringLastDbConnectionId" value="3d9c7527-679c-4559-8bf3-25ac0ca81a95" />
+    <option name="reLastEntityCreationPackage" value="cart-service/src/main/java/fit/iuh/edu/vn/cart_service/models" />
+    <option name="reverseEngineeringLastDbConnectionId" value="ec1add94-5af9-4759-a32b-6f7933033799" />
   </component>
 </project>
