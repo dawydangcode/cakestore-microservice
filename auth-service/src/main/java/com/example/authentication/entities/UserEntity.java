@@ -78,6 +78,12 @@ public class UserEntity implements UserDetails {
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority(role.name()));
     }
+    @PrePersist
+    public void prePersist() {
+        if (role == null) {
+            role = Role.USER;
+        }
+    }
 
     @Override
     public String getUsername() {
