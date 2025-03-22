@@ -4,6 +4,8 @@ import fit.iuh.edu.vn.cart_service.models.CartItem;
 import fit.iuh.edu.vn.cart_service.services.CartService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,19 +19,24 @@ public class CartController {
     private CartService cartService;
 
     @PostMapping("/addItemToCart")
-    public ResponseEntity<String> addToCart(@RequestBody Map<String, Object> requestBody) {
-        Long userId = requestBody.containsKey("userId") ? ((Number) requestBody.get("userId")).longValue() : null;
+    public ResponseEntity<String> addToCart(
+            @RequestBody Map<String, Object> requestBody,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        // userDetails.getUsername() trả về "giahuy1" hoặc "giahuy2"
+        String userName = userDetails.getUsername();
         Long productId = ((Number) requestBody.get("productId")).longValue();
         int quantity = ((Number) requestBody.get("quantity")).intValue();
         float price = ((Number) requestBody.get("price")).floatValue();
 
-        cartService.addItemToCart(userId, productId, quantity, price);
+        // Gọi CartService với userName thay vì userId
+        cartService.addItemToCartByUserName(userName, productId, quantity, price);
         return ResponseEntity.ok("Product added to cart successfully");
     }
 
     @GetMapping("/getCartItems")
-    public ResponseEntity<List<CartItem>> getCartItems(@RequestParam(required = false) Long userId) {
-        List<CartItem> cartItems = cartService.getCartItems(userId);
+    public ResponseEntity<List<CartItem>> getCartItems(@AuthenticationPrincipal UserDetails userDetails) {
+        String userName = userDetails.getUsername();
+        List<CartItem> cartItems = cartService.getCartItemsByUserName(userName);
         return ResponseEntity.ok(cartItems);
     }
 }

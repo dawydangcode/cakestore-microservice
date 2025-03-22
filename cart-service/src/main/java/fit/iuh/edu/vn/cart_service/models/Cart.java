@@ -56,4 +56,8 @@ public class Cart {
     public void setUpdatedAt(LocalDate updatedAt) {
         this.updatedAt = updatedAt;
     }
+
+    public void setUserName(String userName) {
+
+    }
 }
