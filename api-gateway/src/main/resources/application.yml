@@ -1,5 +1,5 @@
 server:
-  port: 8080  
+  port: 8080
 
 spring:
   application:
@@ -14,6 +14,14 @@ spring:
           uri: lb://AUTH-SERVICE
           predicates:
             - Path=/auth/**
+        - id: auth-signin
+          uri: lb://AUTH-SERVICE
+          predicates:
+            - Path=/sign-in
+        - id: auth-signup
+          uri: lb://AUTH-SERVICE
+          predicates:
+            - Path=/sign-up
         - id: order-service
           uri: lb://ORDER-SERVICE
           predicates:
@@ -26,6 +34,19 @@ spring:
           uri: lb://CART-SERVICE
           predicates:
             - Path=/carts/**
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "http://localhost:3000"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
 
 eureka:
   client:
