@@ -26,7 +26,17 @@ public class AuthController {
 
     @PostMapping("/sign-in")
     public ResponseEntity<ApiResponse<?>> signInUser(@RequestBody @Valid SignInRequest signInRequest) {
-        return authService.signIn(signInRequest);
+        try {
+            return authService.signIn(signInRequest);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(
+                    ApiResponse.builder()
+                            .status("FAILED")
+                            .message("Login Failed: Invalid username or password")
+                            .response(null)
+                            .build()
+            );
+        }
     }
 
     @PostMapping("/sign-up")
