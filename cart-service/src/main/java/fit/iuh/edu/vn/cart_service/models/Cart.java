@@ -16,7 +16,7 @@ public class Cart {
     @Column(name = "cart_id", nullable = false)
     private Long id;
 
-    @Column(name = "user_id")
+    @Column(name = "user_id", nullable = false)
     private Long userId;
 
     @Column(name = "created_at")
@@ -31,14 +31,6 @@ public class Cart {
 
     public void setId(Long id) {
         this.id = id;
-    }
-
-    public Long getUserId() {
-        return userId;
-    }
-
-    public void setUserId(Long userId) {
-        this.userId = userId;
     }
 
     public LocalDate getCreatedAt() {
@@ -57,7 +49,4 @@ public class Cart {
         this.updatedAt = updatedAt;
     }
 
-    public void setUserName(String userName) {
-
-    }
 }

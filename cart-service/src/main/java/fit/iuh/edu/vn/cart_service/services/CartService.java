@@ -21,31 +21,28 @@ public class CartService {
     private CartItemRepository cartItemRepository;
 
     public void addItemToCart(Long userId, Long productId, int quantity, float price) {
-        // Tìm giỏ hàng của người dùng hoặc tạo giỏ hàng mặc định
-        Optional<Cart> optionalCart = userId != null ? Optional.ofNullable(cartRepository.findByUserId(userId)) : Optional.empty();
+        if (userId == null) {
+            throw new IllegalArgumentException("userId cannot be null");
+        }
+
+        Optional<Cart> optionalCart = Optional.ofNullable(cartRepository.findByUserId(userId));
         Cart cart;
         if (optionalCart.isPresent()) {
             cart = optionalCart.get();
         } else {
-            // Tạo giỏ hàng mới nếu chưa có
             cart = new Cart();
-            if (userId != null) {
-                cart.setUserId(userId);
-            }
+            cart.setUserId(userId);
             cart.setCreatedAt(LocalDate.now());
             cart.setUpdatedAt(LocalDate.now());
             cart = cartRepository.save(cart);
         }
 
-        // Tìm sản phẩm trong giỏ hàng
         Optional<CartItem> optionalCartItem = Optional.ofNullable(cartItemRepository.findByCartIdAndProductId(cart.getId(), productId));
         CartItem cartItem;
         if (optionalCartItem.isPresent()) {
-            // Cập nhật số lượng nếu sản phẩm đã có trong giỏ hàng
             cartItem = optionalCartItem.get();
             cartItem.setQuantity(cartItem.getQuantity() + quantity);
         } else {
-            // Thêm sản phẩm mới vào giỏ hàng
             cartItem = new CartItem();
             cartItem.setCartId(cart.getId());
             cartItem.setProductId(productId);
@@ -56,51 +53,15 @@ public class CartService {
     }
 
     public List<CartItem> getCartItems(Long userId) {
-        Optional<Cart> optionalCart = userId != null ? Optional.ofNullable(cartRepository.findByUserId(userId)) : Optional.empty();
+        if (userId == null) {
+            throw new IllegalArgumentException("userId cannot be null");
+        }
+
+        Optional<Cart> optionalCart = Optional.ofNullable(cartRepository.findByUserId(userId));
         if (optionalCart.isPresent()) {
             return cartItemRepository.findByCartId(optionalCart.get().getId());
         }
         return List.of();
     }
 
-    public void addItemToCartByUserName(String userName, Long productId, int quantity, float price) {
-        // Tìm giỏ hàng của người dùng hoặc tạo giỏ hàng mặc định
-        Optional<Cart> optionalCart = Optional.ofNullable(cartRepository.findByUserName(userName));
-        Cart cart;
-        if (optionalCart.isPresent()) {
-            cart = optionalCart.get();
-        } else {
-            // Tạo giỏ hàng mới nếu chưa có
-            cart = new Cart();
-            cart.setUserName(userName);
-            cart.setCreatedAt(LocalDate.now());
-            cart.setUpdatedAt(LocalDate.now());
-            cart = cartRepository.save(cart);
-        }
-
-        // Tìm sản phẩm trong giỏ hàng
-        Optional<CartItem> optionalCartItem = Optional.ofNullable(cartItemRepository.findByCartIdAndProductId(cart.getId(), productId));
-        CartItem cartItem;
-        if (optionalCartItem.isPresent()) {
-            // Cập nhật số lượng nếu sản phẩm đã có trong giỏ hàng
-            cartItem = optionalCartItem.get();
-            cartItem.setQuantity(cartItem.getQuantity() + quantity);
-        } else {
-            // Thêm sản phẩm mới vào giỏ hàng
-            cartItem = new CartItem();
-            cartItem.setCartId(cart.getId());
-            cartItem.setProductId(productId);
-            cartItem.setQuantity(quantity);
-            cartItem.setPrice(price);
-        }
-        cartItemRepository.save(cartItem);
-    }
-
-    public List<CartItem> getCartItemsByUserName(String userName) {
-        Optional<Cart> optionalCart = Optional.ofNullable(cartRepository.findByUserName(userName));
-        if (optionalCart.isPresent()) {
-            return cartItemRepository.findByCartId(optionalCart.get().getId());
-        }
-        return List.of();
-    }
 }

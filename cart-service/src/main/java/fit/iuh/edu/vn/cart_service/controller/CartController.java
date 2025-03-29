@@ -2,6 +2,7 @@ package fit.iuh.edu.vn.cart_service.controller;
 
 import fit.iuh.edu.vn.cart_service.models.CartItem;
 import fit.iuh.edu.vn.cart_service.services.CartService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -19,24 +20,16 @@ public class CartController {
     private CartService cartService;
 
     @PostMapping("/addItemToCart")
-    public ResponseEntity<String> addToCart(
-            @RequestBody Map<String, Object> requestBody,
-            @AuthenticationPrincipal UserDetails userDetails) {
-        // userDetails.getUsername() trả về "giahuy1" hoặc "giahuy2"
-        String userName = userDetails.getUsername();
+    public ResponseEntity<String> addToCart(@RequestBody Map<String, Object> requestBody, HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
         Long productId = ((Number) requestBody.get("productId")).longValue();
         int quantity = ((Number) requestBody.get("quantity")).intValue();
         float price = ((Number) requestBody.get("price")).floatValue();
 
-        // Gọi CartService với userName thay vì userId
-        cartService.addItemToCartByUserName(userName, productId, quantity, price);
+        cartService.addItemToCart(userId, productId, quantity, price);
         return ResponseEntity.ok("Product added to cart successfully");
     }
 
-    @GetMapping("/getCartItems")
-    public ResponseEntity<List<CartItem>> getCartItems(@AuthenticationPrincipal UserDetails userDetails) {
-        String userName = userDetails.getUsername();
-        List<CartItem> cartItems = cartService.getCartItemsByUserName(userName);
-        return ResponseEntity.ok(cartItems);
-    }
+
+
 }
