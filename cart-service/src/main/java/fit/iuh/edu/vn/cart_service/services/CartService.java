@@ -20,18 +20,18 @@ public class CartService {
     @Autowired
     private CartItemRepository cartItemRepository;
 
-    public void addItemToCart(Long userId, Long productId, int quantity, float price) {
-        if (userId == null) {
-            throw new IllegalArgumentException("userId cannot be null");
+    public void addItemToCart(String userName, Long productId, int quantity, float price) {
+        if (userName == null) {
+            throw new IllegalArgumentException("userName cannot be null");
         }
 
-        Optional<Cart> optionalCart = Optional.ofNullable(cartRepository.findByUserId(userId));
+        Optional<Cart> optionalCart = Optional.ofNullable(cartRepository.findByUserName(userName));
         Cart cart;
         if (optionalCart.isPresent()) {
             cart = optionalCart.get();
         } else {
             cart = new Cart();
-            cart.setUserId(userId);
+            cart.setUserName(userName);
             cart.setCreatedAt(LocalDate.now());
             cart.setUpdatedAt(LocalDate.now());
             cart = cartRepository.save(cart);
@@ -52,16 +52,15 @@ public class CartService {
         cartItemRepository.save(cartItem);
     }
 
-    public List<CartItem> getCartItems(Long userId) {
-        if (userId == null) {
-            throw new IllegalArgumentException("userId cannot be null");
+    public List<CartItem> getCartItems(String userName) {
+        if (userName == null) {
+            throw new IllegalArgumentException("userName cannot be null");
         }
 
-        Optional<Cart> optionalCart = Optional.ofNullable(cartRepository.findByUserId(userId));
+        Optional<Cart> optionalCart = Optional.ofNullable(cartRepository.findByUserName(userName));
         if (optionalCart.isPresent()) {
             return cartItemRepository.findByCartId(optionalCart.get().getId());
         }
         return List.of();
     }
-
 }

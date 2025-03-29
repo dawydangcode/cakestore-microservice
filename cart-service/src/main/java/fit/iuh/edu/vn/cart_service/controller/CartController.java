@@ -20,16 +20,29 @@ public class CartController {
     private CartService cartService;
 
     @PostMapping("/addItemToCart")
-    public ResponseEntity<String> addToCart(@RequestBody Map<String, Object> requestBody, HttpServletRequest request) {
-        Long userId = (Long) request.getAttribute("userId");
+    public ResponseEntity<String> addToCart(
+            @RequestBody Map<String, Object> requestBody,
+            HttpServletRequest request) {
+        String userName = (String) request.getAttribute("userName"); // Lấy từ token
+        if (userName == null) {
+            return ResponseEntity.status(401).body("Unauthorized: Invalid token");
+        }
         Long productId = ((Number) requestBody.get("productId")).longValue();
         int quantity = ((Number) requestBody.get("quantity")).intValue();
         float price = ((Number) requestBody.get("price")).floatValue();
 
-        cartService.addItemToCart(userId, productId, quantity, price);
+        cartService.addItemToCart(userName, productId, quantity, price);
         return ResponseEntity.ok("Product added to cart successfully");
     }
 
-
+    @GetMapping("/getCartItems")
+    public ResponseEntity<List<CartItem>> getCartItems(HttpServletRequest request) {
+        String userName = (String) request.getAttribute("userName");
+        if (userName == null) {
+            return ResponseEntity.status(401).body(null);
+        }
+        List<CartItem> cartItems = cartService.getCartItems(userName);
+        return ResponseEntity.ok(cartItems);
+    }
 
 }

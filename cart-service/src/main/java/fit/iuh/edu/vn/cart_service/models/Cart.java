@@ -16,8 +16,8 @@ public class Cart {
     @Column(name = "cart_id", nullable = false)
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @Column(name = "user_name", nullable = false) // Thay user_id thành user_name
+    private String userName;
 
     @Column(name = "created_at")
     private LocalDate createdAt;
@@ -27,10 +27,6 @@ public class Cart {
 
     public Long getId() {
         return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
     }
 
     public LocalDate getCreatedAt() {
@@ -47,6 +43,13 @@ public class Cart {
 
     public void setUpdatedAt(LocalDate updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getUserName() {
+        return userName;
+    }
+    public void setUserName(String userName) {
+        this.userName = userName;
     }
 
 }
