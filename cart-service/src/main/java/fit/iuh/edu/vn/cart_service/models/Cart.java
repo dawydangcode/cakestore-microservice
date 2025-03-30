@@ -16,7 +16,7 @@ public class Cart {
     @Column(name = "cart_id", nullable = false)
     private Long id;
 
-    @Column(name = "user_name", nullable = false) // Thay user_id thành user_name
+    @Column(name = "user_name", nullable = false)
     private String userName;
 
     @Column(name = "created_at")

@@ -18,13 +18,13 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable()) // Tắt CSRF với cú pháp lambda
+                .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/carts/**").authenticated() // Chỉ yêu cầu xác thực cho /carts/**
-                        .anyRequest().permitAll() // Các request khác không cần xác thực (tùy chọn)
+                        .requestMatchers("/carts/**").authenticated() // Chỉ yêu cầu token hợp lệ
+                        .anyRequest().permitAll()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-
         return http.build();
     }
+
 }

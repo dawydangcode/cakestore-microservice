@@ -24,7 +24,6 @@ public class CartService {
         if (userName == null) {
             throw new IllegalArgumentException("userName cannot be null");
         }
-
         Optional<Cart> optionalCart = Optional.ofNullable(cartRepository.findByUserName(userName));
         Cart cart;
         if (optionalCart.isPresent()) {
@@ -63,4 +62,6 @@ public class CartService {
         }
         return List.of();
     }
+
 }
+
