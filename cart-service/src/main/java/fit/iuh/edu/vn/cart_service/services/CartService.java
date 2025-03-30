@@ -20,32 +20,28 @@ public class CartService {
     @Autowired
     private CartItemRepository cartItemRepository;
 
-    public void addItemToCart(Long userId, Long productId, int quantity, float price) {
-        // Tìm giỏ hàng của người dùng hoặc tạo giỏ hàng mặc định
-        Optional<Cart> optionalCart = userId != null ? Optional.ofNullable(cartRepository.findByUserId(userId)) : Optional.empty();
+    public void addItemToCart(String userName, Long productId, int quantity, float price) {
+        if (userName == null) {
+            throw new IllegalArgumentException("userName cannot be null");
+        }
+        Optional<Cart> optionalCart = Optional.ofNullable(cartRepository.findByUserName(userName));
         Cart cart;
         if (optionalCart.isPresent()) {
             cart = optionalCart.get();
         } else {
-            // Tạo giỏ hàng mới nếu chưa có
             cart = new Cart();
-            if (userId != null) {
-                cart.setUserId(userId);
-            }
+            cart.setUserName(userName);
             cart.setCreatedAt(LocalDate.now());
             cart.setUpdatedAt(LocalDate.now());
             cart = cartRepository.save(cart);
         }
 
-        // Tìm sản phẩm trong giỏ hàng
         Optional<CartItem> optionalCartItem = Optional.ofNullable(cartItemRepository.findByCartIdAndProductId(cart.getId(), productId));
         CartItem cartItem;
         if (optionalCartItem.isPresent()) {
-            // Cập nhật số lượng nếu sản phẩm đã có trong giỏ hàng
             cartItem = optionalCartItem.get();
             cartItem.setQuantity(cartItem.getQuantity() + quantity);
         } else {
-            // Thêm sản phẩm mới vào giỏ hàng
             cartItem = new CartItem();
             cartItem.setCartId(cart.getId());
             cartItem.setProductId(productId);
@@ -55,11 +51,17 @@ public class CartService {
         cartItemRepository.save(cartItem);
     }
 
-    public List<CartItem> getCartItems(Long userId) {
-        Optional<Cart> optionalCart = userId != null ? Optional.ofNullable(cartRepository.findByUserId(userId)) : Optional.empty();
+    public List<CartItem> getCartItems(String userName) {
+        if (userName == null) {
+            throw new IllegalArgumentException("userName cannot be null");
+        }
+
+        Optional<Cart> optionalCart = Optional.ofNullable(cartRepository.findByUserName(userName));
         if (optionalCart.isPresent()) {
             return cartItemRepository.findByCartId(optionalCart.get().getId());
         }
         return List.of();
     }
+
 }
+
