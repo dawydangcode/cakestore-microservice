@@ -54,6 +54,4 @@ public class CartController {
         List<CartItem> cartItems = cartService.getCartItems(userName);
         return ResponseEntity.ok(cartItems);
     }
-
-
 }
