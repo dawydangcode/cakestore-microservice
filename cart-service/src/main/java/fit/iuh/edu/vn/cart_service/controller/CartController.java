@@ -1,12 +1,12 @@
 package fit.iuh.edu.vn.cart_service.controller;
 
+import fit.iuh.edu.vn.cart_service.dto.AddToCartResponse;
 import fit.iuh.edu.vn.cart_service.models.CartItem;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.parameters.P;
 import org.springframework.web.bind.annotation.*;
 import fit.iuh.edu.vn.cart_service.services.CartService;
 
@@ -23,7 +23,7 @@ public class CartController {
     private CartService cartService;
 
     @PostMapping("/addItemToCart")
-    public ResponseEntity<String> addToCart(
+    public ResponseEntity<AddToCartResponse> addToCart(
             @RequestBody Map<String, Object> requestBody,
             HttpServletRequest request) {
         logger.info("Received POST /carts/addItemToCart with body: " + requestBody);
@@ -31,15 +31,20 @@ public class CartController {
         logger.info("UserName from request: " + userName);
         if (userName == null) {
             logger.warn("Unauthorized: Invalid token");
-            return ResponseEntity.status(401).body("Unauthorized: Invalid token");
+            return ResponseEntity.status(401).body(new AddToCartResponse("Unauthorized: Invalid token", null, null, null));
         }
         Long productId = ((Number) requestBody.get("productId")).longValue();
         int quantity = ((Number) requestBody.get("quantity")).intValue();
         float price = ((Number) requestBody.get("price")).floatValue();
 
         logger.info("Adding item to cart for userName: " + userName + ", productId: " + productId);
-        cartService.addItemToCart(userName, productId, quantity, price);
-        return ResponseEntity.ok("Product added to cart successfully");
+        CartItem addedItem = cartService.addItemToCart(userName, productId, quantity, price); // Lấy CartItem vừa thêm
+        List<CartItem> cartItems = cartService.getCartItems(userName); // Lấy toàn bộ giỏ hàng
+
+        AddToCartResponse response = new AddToCartResponse(
+                "Product added to cart successfully", userName, addedItem, cartItems
+        );
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/getCartItems")

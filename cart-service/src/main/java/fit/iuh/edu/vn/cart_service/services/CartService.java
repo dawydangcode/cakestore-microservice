@@ -20,7 +20,7 @@ public class CartService {
     @Autowired
     private CartItemRepository cartItemRepository;
 
-    public void addItemToCart(String userName, Long productId, int quantity, float price) {
+    public CartItem addItemToCart(String userName, Long productId, int quantity, float price) {
         if (userName == null) {
             throw new IllegalArgumentException("userName cannot be null");
         }
@@ -48,20 +48,18 @@ public class CartService {
             cartItem.setQuantity(quantity);
             cartItem.setPrice(price);
         }
-        cartItemRepository.save(cartItem);
+        cartItem = cartItemRepository.save(cartItem); // Lưu và trả về CartItem
+        return cartItem;
     }
 
     public List<CartItem> getCartItems(String userName) {
         if (userName == null) {
             throw new IllegalArgumentException("userName cannot be null");
         }
-
         Optional<Cart> optionalCart = Optional.ofNullable(cartRepository.findByUserName(userName));
         if (optionalCart.isPresent()) {
             return cartItemRepository.findByCartId(optionalCart.get().getId());
         }
         return List.of();
     }
-
 }
-
