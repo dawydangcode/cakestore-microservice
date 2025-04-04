@@ -59,4 +59,14 @@ public class CartController {
         List<CartItem> cartItems = cartService.getCartItems(userName);
         return ResponseEntity.ok(cartItems);
     }
+    @DeleteMapping("/cart/{cartId}/item/{productId}")
+    public ResponseEntity<String> removeItemFromCart(@PathVariable Long cartId, @PathVariable Long productId) {
+        try {
+            cartService.removeItem(cartId, productId);
+            return ResponseEntity.ok("Item removed from cart successfully!");
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
 }

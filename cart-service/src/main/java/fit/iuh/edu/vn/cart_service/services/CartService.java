@@ -5,7 +5,12 @@ import fit.iuh.edu.vn.cart_service.models.CartItem;
 import fit.iuh.edu.vn.cart_service.repositories.CartItemRepository;
 import fit.iuh.edu.vn.cart_service.repositories.CartRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -62,4 +67,15 @@ public class CartService {
         }
         return List.of();
     }
+    // Xóa sản phẩm khỏi giỏ hàng
+    public void removeItem(Long cartId, Long productId) {
+        CartItem cartItem = cartItemRepository.findByCartIdAndProductId(cartId, productId);
+        if (cartItem != null) {
+            cartItemRepository.delete(cartItem);
+        } else {
+            throw new IllegalArgumentException("Item with productId " + productId + " not found in cart " + cartId);
+        }
+    }
+
+
 }
