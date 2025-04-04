@@ -76,6 +76,18 @@ public class CartService {
             throw new IllegalArgumentException("Item with productId " + productId + " not found in cart " + cartId);
         }
     }
-
+    // Giảm số lượng sản phẩm trong giỏ hàng
+    public void decreaseItemQuantity(Long cartId, Long productId, int amount) {
+        CartItem cartItem = cartItemRepository.findByCartIdAndProductId(cartId, productId);
+        if (cartItem != null) {
+            int newQuantity = cartItem.getQuantity() - amount;
+            if (newQuantity <= 0) {
+                cartItemRepository.delete(cartItem);
+            } else {
+                cartItem.setQuantity(newQuantity);
+                cartItemRepository.save(cartItem);
+            }
+        }
+    }
 
 }

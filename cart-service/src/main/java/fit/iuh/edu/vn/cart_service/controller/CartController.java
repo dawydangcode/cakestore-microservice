@@ -69,4 +69,12 @@ public class CartController {
         }
     }
 
+    @PutMapping("/cart/{cartId}/item/{productId}/decrease")
+    public ResponseEntity<String> decreaseItemQuantity(
+            @PathVariable Long cartId,
+            @PathVariable Long productId,
+            @RequestParam(defaultValue = "1") int amount) {
+        cartService.decreaseItemQuantity(cartId, productId, amount);
+        return ResponseEntity.ok("Item quantity updated or removed successfully!");
+    }
 }
