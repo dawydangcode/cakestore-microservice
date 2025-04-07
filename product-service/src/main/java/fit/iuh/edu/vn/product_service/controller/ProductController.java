@@ -38,5 +38,7 @@ public class ProductController {
     public ResponseEntity<List<Product>> getProductList() {
         List<Product> products = productRepository.findAll();
         return ResponseEntity.ok(products);
+
+
     }
 }
