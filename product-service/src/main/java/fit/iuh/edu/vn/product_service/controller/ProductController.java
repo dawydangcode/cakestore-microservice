@@ -13,6 +13,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.client.RestTemplate;
 
@@ -40,9 +41,10 @@ public class ProductController {
         List<Product> products = productRepository.findAll();
         return ResponseEntity.ok(products);
     }
+
     @PostMapping("/add")
-    public ResponseEntity<Product> addProduct(Product product) {
-        Product savedProduct = productRepository.save(product);
+    public ResponseEntity<Product> addProduct(@RequestBody Product product) {
+        Product savedProduct = productService.addProduct(product);
         return ResponseEntity.ok(savedProduct);
     }
 }
