@@ -59,4 +59,26 @@ public class CartController {
         List<CartItem> cartItems = cartService.getCartItems(userName);
         return ResponseEntity.ok(cartItems);
     }
+
+    @PutMapping("/cart/{cartId}/item/{productId}/increase")
+    public ResponseEntity<String> increaseItemQuantity(
+            @PathVariable Long cartId,
+            @PathVariable Long productId,
+            @RequestParam(defaultValue = "1") int amount) {
+        try {
+            cartService.increaseItemQuantity(cartId, productId, amount);
+            return ResponseEntity.ok("Item quantity increased successfully!");
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PutMapping("/cart/{cartId}/item/{productId}/decrease")
+    public ResponseEntity<String> decreaseItemQuantity(
+            @PathVariable Long cartId,
+            @PathVariable Long productId,
+            @RequestParam(defaultValue = "1") int amount) {
+        cartService.decreaseItemQuantity(cartId, productId, amount);
+        return ResponseEntity.ok("Item quantity updated or removed successfully!");
+    }
 }

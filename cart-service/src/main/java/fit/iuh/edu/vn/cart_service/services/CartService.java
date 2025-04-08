@@ -48,7 +48,7 @@ public class CartService {
             cartItem.setQuantity(quantity);
             cartItem.setPrice(price);
         }
-        cartItem = cartItemRepository.save(cartItem); // Lưu và trả về CartItem
+        cartItem = cartItemRepository.save(cartItem);
         return cartItem;
     }
 
@@ -61,5 +61,39 @@ public class CartService {
             return cartItemRepository.findByCartId(optionalCart.get().getId());
         }
         return List.of();
+    }
+
+    public void removeItem(Long cartId, Long productId) {
+        CartItem cartItem = cartItemRepository.findByCartIdAndProductId(cartId, productId);
+        if (cartItem != null) {
+            cartItemRepository.delete(cartItem);
+        } else {
+            throw new IllegalArgumentException("Item with productId " + productId + " not found in cart " + cartId);
+        }
+    }
+
+    public void decreaseItemQuantity(Long cartId, Long productId, int amount) {
+        CartItem cartItem = cartItemRepository.findByCartIdAndProductId(cartId, productId);
+        if (cartItem != null) {
+            int newQuantity = cartItem.getQuantity() - amount;
+            if (newQuantity <= 0) {
+                cartItemRepository.delete(cartItem);
+            } else {
+                cartItem.setQuantity(newQuantity);
+                cartItemRepository.save(cartItem);
+            }
+        } else {
+            throw new IllegalArgumentException("Item not found");
+        }
+    }
+
+    public void increaseItemQuantity(Long cartId, Long productId, int amount) {
+        CartItem cartItem = cartItemRepository.findByCartIdAndProductId(cartId, productId);
+        if (cartItem != null) {
+            cartItem.setQuantity(cartItem.getQuantity() + amount);
+            cartItemRepository.save(cartItem);
+        } else {
+            throw new IllegalArgumentException("Item not found");
+        }
     }
 }
