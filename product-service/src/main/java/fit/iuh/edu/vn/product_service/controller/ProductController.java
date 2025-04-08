@@ -11,15 +11,12 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
 
-@Controller
+@RestController
 @RequestMapping("/products")
 public class ProductController {
     private final DiscoveryClient discoveryClient;
@@ -40,8 +37,6 @@ public class ProductController {
     public ResponseEntity<List<Product>> getProductList() {
         List<Product> products = productRepository.findAll();
         return ResponseEntity.ok(products);
-
-
     }
 
     @PostMapping("/add")
@@ -49,4 +44,23 @@ public class ProductController {
         Product savedProduct = productService.addProduct(product);
         return ResponseEntity.ok(savedProduct);
     }
+
+    @PutMapping("/update/{id}")
+    public ResponseEntity<Product> updateProduct(@PathVariable Long id, @RequestBody Product product) {
+        Product updatedProduct = productService.updateProduct(id, product);
+        if (updatedProduct == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(updatedProduct);
+    }
+
+    @DeleteMapping("/delete/{id}")
+    public ResponseEntity<String> deleteProduct(@PathVariable Long id) {
+        boolean deleted = productService.deleteProduct(id);
+        if (!deleted) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok("Sản phẩm đã được xóa thành công");
+    }
+
 }
