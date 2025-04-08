@@ -81,4 +81,24 @@ public class CartController {
         cartService.decreaseItemQuantity(cartId, productId, amount);
         return ResponseEntity.ok("Item quantity updated or removed successfully!");
     }
+
+    @DeleteMapping("/cart/{cartId}/item/{productId}")
+    public ResponseEntity<String> removeItemFromCart(
+            @PathVariable Long cartId,
+            @PathVariable Long productId,
+            HttpServletRequest request) {
+        logger.info("Received DELETE /carts/cart/{}/item/{}", cartId, productId);
+        String userName = (String) request.getAttribute("userName");
+        if (userName == null) {
+            logger.warn("Unauthorized: Invalid token");
+            return ResponseEntity.status(401).body("Unauthorized: Invalid token");
+        }
+        try {
+            cartService.removeItem(cartId, productId);
+            return ResponseEntity.ok("Item removed from cart successfully!");
+        } catch (IllegalArgumentException e) {
+            logger.warn("Failed to remove item: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
 }
