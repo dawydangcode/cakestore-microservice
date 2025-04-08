@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class ProductService {
@@ -24,5 +25,28 @@ public class ProductService {
         product.setUpdateAt(LocalDate.now());
 
         return productRepository.save(product);
+    }
+
+    public Product updateProduct(Long id, Product product) {
+        Optional<Product> existingProduct = productRepository.findById(id);
+        if (existingProduct.isPresent()) {
+            Product p = existingProduct.get();
+            p.setCategoryId(product.getCategoryId());
+            p.setName(product.getName());
+            p.setDescription(product.getDescription());
+            p.setPrice(product.getPrice());
+            p.setStock(product.getStock());
+            p.setUpdateAt(LocalDate.now());
+            return productRepository.save(p);
+        }
+        return null;
+    }
+
+    public boolean deleteProduct(Long id) {
+        if (productRepository.existsById(id)) {
+            productRepository.deleteById(id);
+            return true;
+        }
+        return false;
     }
 }
