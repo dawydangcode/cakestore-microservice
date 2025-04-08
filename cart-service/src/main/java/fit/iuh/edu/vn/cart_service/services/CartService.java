@@ -5,12 +5,7 @@ import fit.iuh.edu.vn.cart_service.models.CartItem;
 import fit.iuh.edu.vn.cart_service.repositories.CartItemRepository;
 import fit.iuh.edu.vn.cart_service.repositories.CartRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -53,7 +48,7 @@ public class CartService {
             cartItem.setQuantity(quantity);
             cartItem.setPrice(price);
         }
-        cartItem = cartItemRepository.save(cartItem); // Lưu và trả về CartItem
+        cartItem = cartItemRepository.save(cartItem);
         return cartItem;
     }
 
@@ -67,7 +62,7 @@ public class CartService {
         }
         return List.of();
     }
-    // Xóa sản phẩm khỏi giỏ hàng
+
     public void removeItem(Long cartId, Long productId) {
         CartItem cartItem = cartItemRepository.findByCartIdAndProductId(cartId, productId);
         if (cartItem != null) {
@@ -76,7 +71,7 @@ public class CartService {
             throw new IllegalArgumentException("Item with productId " + productId + " not found in cart " + cartId);
         }
     }
-    // Giảm số lượng sản phẩm trong giỏ hàng
+
     public void decreaseItemQuantity(Long cartId, Long productId, int amount) {
         CartItem cartItem = cartItemRepository.findByCartIdAndProductId(cartId, productId);
         if (cartItem != null) {
@@ -87,7 +82,18 @@ public class CartService {
                 cartItem.setQuantity(newQuantity);
                 cartItemRepository.save(cartItem);
             }
+        } else {
+            throw new IllegalArgumentException("Item not found");
         }
     }
 
+    public void increaseItemQuantity(Long cartId, Long productId, int amount) {
+        CartItem cartItem = cartItemRepository.findByCartIdAndProductId(cartId, productId);
+        if (cartItem != null) {
+            cartItem.setQuantity(cartItem.getQuantity() + amount);
+            cartItemRepository.save(cartItem);
+        } else {
+            throw new IllegalArgumentException("Item not found");
+        }
+    }
 }
