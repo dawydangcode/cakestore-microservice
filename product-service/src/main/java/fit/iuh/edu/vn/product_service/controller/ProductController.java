@@ -1,9 +1,11 @@
-package fit.iuh.edu.vn.product_service.controller;
+package fit.iuh.edu.vn.product_service.controllers;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import fit.iuh.edu.vn.product_service.models.Product;
 import fit.iuh.edu.vn.product_service.services.ProductService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartException;
@@ -22,41 +24,73 @@ public class ProductController {
     @Autowired
     private ProductService productService;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
     @GetMapping("/list")
     public List<Product> getAllProducts() {
         return productService.getAllProducts();
     }
 
-    @PostMapping(value = "/add", consumes = {"multipart/form-data"})
+    @PostMapping(value = "/add", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Product> addProduct(
-            @RequestPart("product") Product product,
-            @RequestPart(value = "image", required = false) MultipartFile imageFile) throws IOException {
-        System.out.println("Received product: " + product);
-        System.out.println("Received image: " + (imageFile != null ? imageFile.getOriginalFilename() : "No image"));
-        Product savedProduct = productService.addProduct(product, imageFile);
-        return ResponseEntity.ok(savedProduct);
+            @RequestPart(value = "product", required = true) String productJson,
+            @RequestPart(value = "image", required = false) MultipartFile imageFile) {
+        try {
+            // Parse chuỗi JSON thành Product
+            Product product;
+            try {
+                product = objectMapper.readValue(productJson, Product.class);
+            } catch (IOException e) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(null);
+            }
+            System.out.println("Parsed product: " + product);
+            System.out.println("Received image: " + (imageFile != null ? imageFile.getOriginalFilename() : "No image"));
+
+            // Lưu sản phẩm
+            Product savedProduct = productService.addProduct(product, imageFile);
+            return ResponseEntity.ok(savedProduct);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(null);
+        }
     }
 
-    // Thêm endpoint mới để test chỉ với JSON
-    @PostMapping(value = "/add-json", consumes = {"application/json"})
+    @PostMapping(value = "/add-json", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Product> addProductJson(@RequestBody Product product) throws IOException {
         System.out.println("Received product (JSON): " + product);
-        Product savedProduct = productService.addProduct(product, null); // Không có image
+        Product savedProduct = productService.addProduct(product, null);
         return ResponseEntity.ok(savedProduct);
     }
 
-    @PutMapping(value = "/update/{id}", consumes = {"multipart/form-data"})
+    @PutMapping(value = "/update/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Product> updateProduct(
             @PathVariable Long id,
-            @RequestPart("product") Product product,
-            @RequestPart(value = "image", required = false) MultipartFile imageFile) throws IOException {
-        System.out.println("Received product for update: " + product);
-        System.out.println("Received image for update: " + (imageFile != null ? imageFile.getOriginalFilename() : "No image"));
-        Product updatedProduct = productService.updateProduct(id, product, imageFile);
-        if (updatedProduct != null) {
-            return ResponseEntity.ok(updatedProduct);
+            @RequestPart(value = "product", required = true) String productJson,
+            @RequestPart(value = "image", required = false) MultipartFile imageFile) {
+        try {
+            // Parse chuỗi JSON thành Product
+            Product product;
+            try {
+                product = objectMapper.readValue(productJson, Product.class);
+            } catch (IOException e) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(null);
+            }
+            System.out.println("Parsed product for update: " + product);
+            System.out.println("Received image for update: " + (imageFile != null ? imageFile.getOriginalFilename() : "No image"));
+
+            // Cập nhật sản phẩm
+            Product updatedProduct = productService.updateProduct(id, product, imageFile);
+            if (updatedProduct != null) {
+                return ResponseEntity.ok(updatedProduct);
+            }
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(null);
         }
-        return ResponseEntity.notFound().build();
     }
 
     @DeleteMapping("/delete/{id}")
@@ -96,5 +130,11 @@ public class ProductController {
     public ResponseEntity<String> handleMultipartException(MultipartException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body("Failed to parse multipart request: " + ex.getMessage() + ". Ensure the request is a valid multipart/form-data with a proper boundary.");
+    }
+
+    // Tiện ích để tạo ResponseEntity với body null và message
+    private <T> ResponseEntity<T> body(T body, String message) {
+        System.out.println(message);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 }
