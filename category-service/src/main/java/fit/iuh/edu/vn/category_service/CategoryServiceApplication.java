@@ -1,4 +1,4 @@
-package fit.iuh.edu.vn.product_service;
+package fit.iuh.edu.vn.category_service;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -6,10 +6,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.web.client.RestTemplate;
 
 @SpringBootApplication
-public class ProductServiceApplication {
+public class CategoryServiceApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(ProductServiceApplication.class, args);
+		SpringApplication.run(CategoryServiceApplication.class, args);
 	}
 	@Bean
 	public RestTemplate restTemplate() {

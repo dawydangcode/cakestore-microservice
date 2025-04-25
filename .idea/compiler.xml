@@ -11,18 +11,20 @@
         <module name="eureka-server" />
         <module name="payment-service" />
       </profile>
-      <profile name="Annotation profile for order-service" enabled="true">
+      <profile name="Annotation profile for product-service" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <processorPath useClasspath="false">
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/unknown/lombok-unknown.jar" />
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/unknown/lombok-unknown.jar" />
         </processorPath>
-        <module name="product-service" />
         <module name="cart-service" />
         <module name="authentication-service" />
-        <module name="order-service" />
+        <module name="category-service" />
+        <module name="product-service" />
         <module name="user-service" />
+        <module name="order-service" />
         <module name="[authenticantion]" />
       </profile>
     </annotationProcessing>
@@ -40,6 +42,7 @@
       <module name="authenticantion-service" options="-parameters" />
       <module name="authentication-service" options="-parameters" />
       <module name="cart-service" options="-parameters" />
+      <module name="category-service" options="-parameters" />
       <module name="eureka-server" options="-parameters" />
       <module name="homepage-service" options="-parameters" />
       <module name="order-service" options="-parameters" />

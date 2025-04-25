@@ -42,6 +42,10 @@ spring:
           uri: lb://PAYMENT-SERVICE
           predicates:
             - Path=/payments/**
+        - id: category-service
+          uri: lb://CATEGORY-SERVICE
+          predicates:
+            - Path=/categories/**
       globalcors:
         cors-configurations:
           '[/**]':
