@@ -46,6 +46,7 @@ public class CategoryService {
         }
         category.setName(categoryDetails.getName());
         category.setDescription(categoryDetails.getDescription());
+        category.setImage(categoryDetails.getImage()); // Cập nhật hình ảnh
         category.setUpdatedAt(LocalDate.now());
         return categoryRepository.save(category);
     }

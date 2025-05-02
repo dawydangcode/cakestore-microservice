@@ -1,5 +1,6 @@
 package fit.iuh.edu.vn.category_service.models;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -26,6 +27,10 @@ public class Category {
 
     @Column(name = "updated_at")
     private LocalDate updatedAt;
+
+    @Column(name = "image")
+    @JsonProperty("image")
+    private String image;
 
     public Long getCategoryId() {
         return categoryId;
@@ -65,5 +70,13 @@ public class Category {
 
     public void setUpdatedAt(LocalDate updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getImage() {
+        return image;
+    }
+
+    public void setImage(String image) {
+        this.image = image;
     }
 }
