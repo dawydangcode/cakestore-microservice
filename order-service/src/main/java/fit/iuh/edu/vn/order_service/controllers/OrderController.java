@@ -2,6 +2,7 @@ package fit.iuh.edu.vn.order_service.controller;
 
 import fit.iuh.edu.vn.order_service.dto.OrderRequest;
 import fit.iuh.edu.vn.order_service.dto.OrderResponse;
+import fit.iuh.edu.vn.order_service.dto.StatusUpdateRequest;
 import fit.iuh.edu.vn.order_service.models.Order;
 import fit.iuh.edu.vn.order_service.services.OrderService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -44,5 +45,17 @@ public class OrderController {
     public ResponseEntity<Order> getOrderById(@PathVariable Long orderId) {
         Order order = orderService.getOrderById(orderId); // Giả định phương thức này
         return ResponseEntity.ok(order);
+    }
+
+    @GetMapping("/all")
+    public ResponseEntity<List<Order>> getAllOrders() {
+        List<Order> orders = orderService.getAllOrders();
+        return ResponseEntity.ok(orders);
+    }
+
+    @PutMapping("/{orderId}/status")
+    public ResponseEntity<Order> updateOrderStatus(@PathVariable Long orderId, @RequestBody StatusUpdateRequest statusUpdate) {
+        Order updatedOrder = orderService.updateOrderStatus(orderId, statusUpdate.getStatus());
+        return ResponseEntity.ok(updatedOrder);
     }
 }

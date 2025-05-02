@@ -103,6 +103,19 @@ public class OrderService {
                 .orElseThrow(() -> new RuntimeException("Order not found with id: " + orderId));
     }
 
+    public List<Order> getAllOrders() {
+        logger.info("Fetching all orders");
+        return orderRepository.findAll();
+    }
+
+    public Order updateOrderStatus(Long orderId, String status) {
+        logger.info("Updating status for orderId: {} to {}", orderId, status);
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found with id: " + orderId));
+        order.setStatus(status);
+        return orderRepository.save(order);
+    }
+
     private Boolean processPayment(String userName, Order order, String token) {
         try {
             PaymentRequest paymentRequest = new PaymentRequest(
@@ -160,4 +173,5 @@ public class OrderService {
                     .block();
         }
     }
+
 }
