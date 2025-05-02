@@ -41,19 +41,16 @@ public class OrderService {
         logger.info("Creating order for user: {}, paymentMethod: {}, status: {}",
                 userName, orderRequest.getPaymentMethod(), "Chờ thanh toán");
 
-        // Lấy giỏ hàng từ cart-service
         List<CartItemDTO> cartItems = fetchCartItems(userName, token);
 
         if (cartItems.isEmpty()) {
             throw new IllegalStateException("Giỏ hàng trống, không thể tạo đơn hàng");
         }
 
-        // Tính tổng giá
         float totalPrice = cartItems.stream()
                 .map(item -> item.getPrice() * item.getQuantity())
                 .reduce(0f, Float::sum);
 
-        // Tạo Order
         Order order = new Order();
         order.setUserName(userName);
         order.setFullName(orderRequest.getFullName());
@@ -65,7 +62,6 @@ public class OrderService {
         order.setPaymentMethod(orderRequest.getPaymentMethod());
         order.setCreatedAt(LocalDateTime.now());
 
-        // Chuyển CartItemDTO thành OrderItem
         List<OrderItem> orderItems = cartItems.stream().map(cartItem -> {
             OrderItem orderItem = new OrderItem();
             orderItem.setOrder(order);
@@ -77,11 +73,9 @@ public class OrderService {
 
         order.setOrderItems(orderItems);
 
-        // Lưu đơn hàng
         logger.info("Saving order: {}", order);
         Order savedOrder = orderRepository.save(order);
 
-        // Gọi payment-service
         Boolean paymentSuccess = processPayment(userName, savedOrder, token);
         if (paymentSuccess != null && paymentSuccess) {
             logger.info("Payment successful, updating order status and clearing cart for user: {}", userName);
@@ -96,6 +90,17 @@ public class OrderService {
         }
 
         return savedOrder;
+    }
+
+    public List<Order> getOrdersByUser(String userName) {
+        logger.info("Fetching orders for user: {}", userName);
+        return orderRepository.findByUserName(userName);
+    }
+
+    public Order getOrderById(Long orderId) {
+        logger.info("Fetching order detail for orderId: {}", orderId);
+        return orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found with id: " + orderId));
     }
 
     private Boolean processPayment(String userName, Order order, String token) {

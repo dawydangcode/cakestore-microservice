@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/orders")
 public class OrderController {
@@ -30,5 +32,17 @@ public class OrderController {
         Order order = orderService.createOrder(userName, orderRequest, token);
         OrderResponse response = new OrderResponse(order);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/user/{userName}")
+    public ResponseEntity<List<Order>> getOrdersByUser(@PathVariable String userName) {
+        List<Order> orders = orderService.getOrdersByUser(userName); // Giả định phương thức này
+        return ResponseEntity.ok(orders);
+    }
+
+    @GetMapping("/{orderId}")
+    public ResponseEntity<Order> getOrderById(@PathVariable Long orderId) {
+        Order order = orderService.getOrderById(orderId); // Giả định phương thức này
+        return ResponseEntity.ok(order);
     }
 }
