@@ -26,6 +26,12 @@ public class CartItem {
     @Column(name = "price")
     private Float price;
 
+    @Transient
+    private String name;
+
+    @Transient
+    private String image;
+
     public Long getId() {
         return id;
     }
@@ -64,5 +70,21 @@ public class CartItem {
 
     public void setPrice(Float price) {
         this.price = price;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getImage() {
+        return image;
+    }
+
+    public void setImage(String image) {
+        this.image = image;
     }
 }

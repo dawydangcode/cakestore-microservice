@@ -6,9 +6,11 @@ import fit.iuh.edu.vn.cart_service.repositories.CartItemRepository;
 import fit.iuh.edu.vn.cart_service.repositories.CartRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -19,6 +21,11 @@ public class CartService {
 
     @Autowired
     private CartItemRepository cartItemRepository;
+
+    @Autowired
+    private RestTemplate restTemplate;
+
+    private static final String PRODUCT_SERVICE_URL = "http://localhost:8082/products/";
 
     public CartItem addItemToCart(String userName, Long productId, int quantity, float price) {
         if (userName == null) {
@@ -58,7 +65,21 @@ public class CartService {
         }
         Optional<Cart> optionalCart = Optional.ofNullable(cartRepository.findByUserName(userName));
         if (optionalCart.isPresent()) {
-            return cartItemRepository.findByCartId(optionalCart.get().getId());
+            List<CartItem> cartItems = cartItemRepository.findByCartId(optionalCart.get().getId());
+            // Fetch thông tin sản phẩm từ product-service
+            for (CartItem item : cartItems) {
+                try {
+                    String productUrl = PRODUCT_SERVICE_URL + item.getProductId();
+                    Map<String, Object> product = restTemplate.getForObject(productUrl, Map.class);
+                    if (product != null) {
+                        item.setName((String) product.get("name"));
+                        item.setImage((String) product.get("image"));
+                    }
+                } catch (Exception e) {
+                    System.err.println("Failed to fetch product info for productId " + item.getProductId() + ": " + e.getMessage());
+                }
+            }
+            return cartItems;
         }
         return List.of();
     }
