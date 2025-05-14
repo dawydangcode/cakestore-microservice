@@ -26,6 +26,12 @@ public class OrderItem {
     @Column(name = "price", nullable = false)
     private float price;
 
+    @Transient
+    private String productName;
+
+    @Transient
+    private String image;
+
     // Constructors
     public OrderItem() {
     }
@@ -69,5 +75,21 @@ public class OrderItem {
 
     public void setPrice(float price) {
         this.price = price;
+    }
+
+    public String getProductName() {
+        return productName;
+    }
+
+    public void setProductName(String productName) {
+        this.productName = productName;
+    }
+
+    public String getImage() {
+        return image;
+    }
+
+    public void setImage(String image) {
+        this.image = image;
     }
 }

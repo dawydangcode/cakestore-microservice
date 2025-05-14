@@ -12,12 +12,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClientException;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -29,13 +30,16 @@ public class OrderService {
     private OrderRepository orderRepository;
 
     @Autowired
-    private WebClient.Builder webClientBuilder;
+    private RestTemplate restTemplate;
 
     @Value("${cart.service.url}")
     private String cartServiceUrl;
 
     @Value("${payment.service.url}")
     private String paymentServiceUrl;
+
+    @Value("${product.service.url}")
+    private String productServiceUrl;
 
     public Order createOrder(String userName, OrderRequest orderRequest, String token) {
         logger.info("Creating order for user: {}, paymentMethod: {}, status: {}",
@@ -94,18 +98,21 @@ public class OrderService {
 
     public List<Order> getOrdersByUser(String userName) {
         logger.info("Fetching orders for user: {}", userName);
-        return orderRepository.findByUserName(userName);
+        List<Order> orders = orderRepository.findByUserName(userName);
+        return enrichOrdersWithProductNames(orders);
     }
 
     public Order getOrderById(Long orderId) {
         logger.info("Fetching order detail for orderId: {}", orderId);
-        return orderRepository.findById(orderId)
+        Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found with id: " + orderId));
+        return enrichOrdersWithProductNames(List.of(order)).get(0);
     }
 
     public List<Order> getAllOrders() {
         logger.info("Fetching all orders");
-        return orderRepository.findAll();
+        List<Order> orders = orderRepository.findAll();
+        return enrichOrdersWithProductNames(orders);
     }
 
     public Order updateOrderStatus(Long orderId, String status) {
@@ -113,7 +120,38 @@ public class OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found with id: " + orderId));
         order.setStatus(status);
-        return orderRepository.save(order);
+        Order updatedOrder = orderRepository.save(order);
+        return enrichOrdersWithProductNames(List.of(updatedOrder)).get(0);
+    }
+
+    private List<Order> enrichOrdersWithProductNames(List<Order> orders) {
+        for (Order order : orders) {
+            for (OrderItem item : order.getOrderItems()) {
+                String productUrl = null;
+                try {
+                    logger.debug("Fetching product details for productId: {}", item.getProductId());
+                    productUrl = productServiceUrl + "/" + item.getProductId();
+                    logger.debug("Calling Product Service: {}", productUrl);
+                    Map<String, Object> product = restTemplate.getForObject(productUrl, Map.class);
+                    logger.debug("Product response for productId {}: {}", item.getProductId(), product);
+                    if (product != null && product.containsKey("name") && product.containsKey("image")) {
+                        item.setProductName((String) product.get("name"));
+                        item.setImage((String) product.get("image"));
+                        logger.debug("Successfully fetched product: {} for productId: {}", product.get("name"), item.getProductId());
+                    } else {
+                        logger.warn("Product response is null or missing name/image for productId: {}", item.getProductId());
+                        item.setProductName("Không xác định");
+                        item.setImage(null);
+                    }
+                } catch (RestClientException e) {
+                    logger.error("Failed to fetch product details for productId: {}. URL: {}. Error: {}",
+                            item.getProductId(), productUrl, e.getMessage());
+                    item.setProductName("Không xác định");
+                    item.setImage(null);
+                }
+            }
+        }
+        return orders;
     }
 
     private Boolean processPayment(String userName, Order order, String token) {
@@ -124,20 +162,13 @@ public class OrderService {
                     order.getPaymentMethod()
             );
             logger.info("Calling payment-service for orderId: {}", order.getId());
-            return webClientBuilder.build()
-                    .post()
-                    .uri(paymentServiceUrl + "/process")
-                    .header("Authorization", "Bearer " + token)
-                    .bodyValue(paymentRequest)
-                    .retrieve()
-                    .bodyToMono(PaymentResponse.class)
-                    .map(response -> "Thành công".equals(response.getStatus()))
-                    .onErrorResume(Throwable.class, e -> {
-                        logger.error("Payment processing failed: {}", e.getMessage());
-                        return Mono.just(false);
-                    })
-                    .block();
-        } catch (Exception e) {
+            PaymentResponse response = restTemplate.postForObject(
+                    paymentServiceUrl + "/process",
+                    paymentRequest,
+                    PaymentResponse.class
+            );
+            return response != null && "Thành công".equals(response.getStatus());
+        } catch (RestClientException e) {
             logger.error("Payment processing failed: {}", e.getMessage());
             return false;
         }
@@ -146,15 +177,12 @@ public class OrderService {
     private List<CartItemDTO> fetchCartItems(String userName, String token) {
         try {
             logger.info("Fetching cart items for user: {}", userName);
-            return webClientBuilder.build()
-                    .get()
-                    .uri(cartServiceUrl + "/getCartItems")
-                    .header("Authorization", "Bearer " + token)
-                    .retrieve()
-                    .bodyToFlux(CartItemDTO.class)
-                    .collectList()
-                    .block();
-        } catch (Exception e) {
+            CartItemDTO[] cartItems = restTemplate.getForObject(
+                    cartServiceUrl + "/getCartItems",
+                    CartItemDTO[].class
+            );
+            return List.of(cartItems);
+        } catch (RestClientException e) {
             logger.error("Failed to fetch cart items: {}", e.getMessage());
             throw new RuntimeException("Không thể lấy giỏ hàng: " + e.getMessage());
         }
@@ -164,14 +192,9 @@ public class OrderService {
         List<CartItemDTO> cartItems = fetchCartItems(userName, token);
         for (CartItemDTO item : cartItems) {
             logger.info("Deleting cart item: cartId={}, productId={}", item.getCartId(), item.getProductId());
-            webClientBuilder.build()
-                    .delete()
-                    .uri(cartServiceUrl + "/cart/" + item.getCartId() + "/item/" + item.getProductId())
-                    .header("Authorization", "Bearer " + token)
-                    .retrieve()
-                    .bodyToMono(Void.class)
-                    .block();
+            restTemplate.delete(
+                    cartServiceUrl + "/cart/" + item.getCartId() + "/item/" + item.getProductId()
+            );
         }
     }
-
 }
