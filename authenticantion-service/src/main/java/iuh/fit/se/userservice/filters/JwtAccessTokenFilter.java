@@ -9,22 +9,28 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.jwt.*;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+
 import java.io.IOException;
 
 @Component
 public class JwtAccessTokenFilter extends OncePerRequestFilter {
 
-    private JwtDecoder jwtDecoder;
-    private JwtTokenUtil jwtTokenUtil;
-    private UserDetailsServiceImpl userDetailsService;
-    private TokenService tokenService;
+    private static final Logger logger = LoggerFactory.getLogger(JwtAccessTokenFilter.class);
+    private final JwtDecoder jwtDecoder;
+    private final JwtTokenUtil jwtTokenUtil;
+    private final UserDetailsServiceImpl userDetailsService;
+    private final TokenService tokenService;
 
     public JwtAccessTokenFilter(JwtDecoder jwtDecoder, JwtTokenUtil jwtTokenUtil,
                                 UserDetailsServiceImpl userDetailsService, TokenService tokenService) {
@@ -37,17 +43,23 @@ public class JwtAccessTokenFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        String authHeader = request.getHeader("Authorization");
+        String requestURI = request.getRequestURI();
+        logger.info("JwtAccessTokenFilter processing request: {}", requestURI);
 
-        if (request.getRequestURI().equals("/sign-in") ||
-                request.getRequestURI().equals("/sign-up")) {
+        // Bỏ qua các endpoint công khai
+        if (requestURI.equals("/sign-in") ||
+                requestURI.equals("/sign-up") ||
+                requestURI.equals("/forgot-password") ||
+                requestURI.equals("/reset-password")) {
+            logger.info("Skipping JwtAccessTokenFilter for: {}", requestURI);
             filterChain.doFilter(request, response);
             return;
         }
 
-        if (null == authHeader || !authHeader.startsWith("Bearer ")) {
-            ((HttpServletResponse) response).sendError(HttpServletResponse.SC_UNAUTHORIZED,
-                    "Please provide a token.");
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            logger.warn("No token provided for request: {}", requestURI);
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Please provide a token.");
             return;
         }
 
@@ -55,22 +67,22 @@ public class JwtAccessTokenFilter extends OncePerRequestFilter {
         Token tokenEntity = tokenService.findByToken(token);
 
         try {
-            if (null != tokenEntity && tokenEntity.revoked) {
-                SecurityContextHolder.clearContext();
-                ((HttpServletResponse) response).sendError(HttpServletResponse.SC_UNAUTHORIZED, "The access token you provided is revoked malformed or invalid.");
+            if (tokenEntity != null && tokenEntity.revoked) {
+                logger.warn("Token is revoked for request: {}", requestURI);
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "The access token you provided is revoked, malformed, or invalid.");
                 return;
             }
 
             Jwt jwtToken = this.jwtDecoder.decode(token);
             String userName = jwtToken.getSubject();
 
-            if(!userName.isEmpty() && SecurityContextHolder.getContext().getAuthentication() == null) {
+            if (!userName.isEmpty() && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserPrincipal userPrincipal = (UserPrincipal) userDetailsService.loadUserByUsername(userName);
 
-                if(jwtTokenUtil.isTokenValid(jwtToken, userPrincipal)) {
+                if (jwtTokenUtil.isTokenValid(jwtToken, userPrincipal)) {
                     SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
-
-                    UsernamePasswordAuthenticationToken createdToken = new UsernamePasswordAuthenticationToken(userPrincipal.getUsername(), userPrincipal.getPassword(), userPrincipal.getAuthorities());
+                    UsernamePasswordAuthenticationToken createdToken = new UsernamePasswordAuthenticationToken(
+                            userPrincipal.getUsername(), userPrincipal.getPassword(), userPrincipal.getAuthorities());
                     createdToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     securityContext.setAuthentication(createdToken);
                     SecurityContextHolder.setContext(securityContext);
@@ -78,9 +90,9 @@ public class JwtAccessTokenFilter extends OncePerRequestFilter {
             }
 
             filterChain.doFilter(request, response);
-        }
-        catch (JwtException ex) {
-            ((HttpServletResponse) response).sendError(HttpServletResponse.SC_UNAUTHORIZED, ex.getMessage());
+        } catch (JwtException ex) {
+            logger.error("JWT validation failed for request: {}, error: {}", requestURI, ex.getMessage());
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, ex.getMessage());
         }
     }
 }

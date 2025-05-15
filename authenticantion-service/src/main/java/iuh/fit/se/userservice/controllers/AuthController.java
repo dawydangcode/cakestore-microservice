@@ -1,6 +1,7 @@
 package iuh.fit.se.userservice.controllers;
 
 import iuh.fit.se.userservice.dtos.ApiResponse;
+import iuh.fit.se.userservice.dtos.ResetPasswordRequest;
 import iuh.fit.se.userservice.dtos.SignInRequest;
 import iuh.fit.se.userservice.dtos.SignUpRequest;
 import iuh.fit.se.userservice.exceptions.UserAlreadyExistsException;
@@ -10,9 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 public class AuthController {
@@ -44,4 +43,23 @@ public class AuthController {
             throws UserAlreadyExistsException {
         return authService.signUp(signUpRequest);
     }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<?>> forgotPassword(@RequestBody @Valid EmailRequest emailRequest) {
+        logger.info("Received forgot password request for email: {}", emailRequest.getEmail());
+        return authService.forgotPassword(emailRequest.getEmail());
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<?>> resetPassword(@RequestBody @Valid ResetPasswordRequest request) {
+        logger.info("Received reset password request for token: {}", request.getToken());
+        return authService.resetPassword(request);
+    }
+}
+
+class EmailRequest {
+    private String email;
+
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
 }

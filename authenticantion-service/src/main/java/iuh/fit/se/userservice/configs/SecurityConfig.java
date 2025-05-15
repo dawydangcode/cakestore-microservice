@@ -37,9 +37,6 @@ import org.springframework.security.oauth2.server.resource.web.access.BearerToke
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 @EnableWebSecurity
@@ -66,25 +63,10 @@ public class SecurityConfig {
     }
 
     @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(java.util.List.of("http://localhost:3000"));
-        configuration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(java.util.List.of("*"));
-        configuration.setAllowCredentials(true);
-        configuration.setMaxAge(3600L);
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
-    }
-
-    // Filter chain xử lý yêu cầu OPTIONS (preflight) cho CORS
-    @Bean
     @Order(0)
     public SecurityFilterChain preflightFilterChain(HttpSecurity http) throws Exception {
         http
-                .securityMatcher(new AntPathRequestMatcher("/**", "OPTIONS")) // Chỉ áp dụng cho OPTIONS
-//                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .securityMatcher(new AntPathRequestMatcher("/**", "OPTIONS"))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll());
         return http.build();
@@ -95,7 +77,6 @@ public class SecurityConfig {
     public SecurityFilterChain signUpSecurityFilterChain(HttpSecurity httpSecurity) throws Exception {
         httpSecurity
                 .securityMatcher(new AntPathRequestMatcher("/sign-up"))
-//                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
                 .httpBasic(Customizer.withDefaults());
@@ -107,7 +88,6 @@ public class SecurityConfig {
     public SecurityFilterChain signInSecurityFilterChain(HttpSecurity httpSecurity) throws Exception {
         httpSecurity
                 .securityMatcher(new AntPathRequestMatcher("/sign-in"))
-//                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -121,10 +101,45 @@ public class SecurityConfig {
 
     @Order(3)
     @Bean
+    public SecurityFilterChain forgotPasswordSecurityFilterChain(HttpSecurity httpSecurity) throws Exception {
+        System.out.println("Configuring forgot-password filter chain");
+        httpSecurity
+                .securityMatcher(new AntPathRequestMatcher("/forgot-password", "POST"))
+                .csrf(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(authorize -> {
+                    System.out.println("Processing /forgot-password request");
+                    authorize.anyRequest().permitAll();
+                })
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+        return httpSecurity.build();
+    }
+
+    @Order(4)
+    @Bean
+    public SecurityFilterChain resetPasswordSecurityFilterChain(HttpSecurity httpSecurity) throws Exception {
+        System.out.println("Configuring reset-password filter chain");
+        httpSecurity
+                .securityMatcher(new AntPathRequestMatcher("/reset-password", "POST"))
+                .csrf(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(authorize -> {
+                    System.out.println("Processing /reset-password request");
+                    authorize.anyRequest().permitAll();
+                })
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+        return httpSecurity.build();
+    }
+
+    @Order(5)
+    @Bean
     SecurityFilterChain apiFilterChain(HttpSecurity httpSecurity) throws Exception {
         httpSecurity
                 .securityMatcher(new AntPathRequestMatcher("/api/**"))
-//                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))
@@ -137,12 +152,11 @@ public class SecurityConfig {
         return httpSecurity.build();
     }
 
-    @Order(4)
+    @Order(6)
     @Bean
     SecurityFilterChain logoutFilterChain(HttpSecurity httpSecurity) throws Exception {
         httpSecurity
                 .securityMatcher(new AntPathRequestMatcher("/logout"))
-//                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))
@@ -159,14 +173,12 @@ public class SecurityConfig {
         return httpSecurity.build();
     }
 
-    // Filter chain mặc định cho các yêu cầu còn lại (catch-all), đặt cuối cùng
     @Bean
-    @Order(5)
+    @Order(7)
     public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
         http
-//                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated()) // Yêu cầu xác thực cho mọi request chưa khớp
+                .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(new BearerTokenAuthenticationEntryPoint())
                         .accessDeniedHandler(this.customAccessDeniedHandler));

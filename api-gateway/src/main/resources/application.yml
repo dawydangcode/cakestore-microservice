@@ -22,6 +22,14 @@ spring:
           uri: lb://AUTH-SERVICE
           predicates:
             - Path=/sign-up
+        - id: auth-forgot-password
+          uri: lb://AUTH-SERVICE
+          predicates:
+            - Path=/forgot-password
+        - id: auth-reset-password
+          uri: lb://AUTH-SERVICE
+          predicates:
+            - Path=/reset-password
         - id: order-service
           uri: lb://ORDER-SERVICE
           predicates:
@@ -34,10 +42,6 @@ spring:
           uri: lb://CART-SERVICE
           predicates:
             - Path=/carts/**
-        - id: order-service
-          uri: lb://ORDER-SERVICE
-          predicates:
-            - Path=/orders/**
         - id: payment-service
           uri: lb://PAYMENT-SERVICE
           predicates:

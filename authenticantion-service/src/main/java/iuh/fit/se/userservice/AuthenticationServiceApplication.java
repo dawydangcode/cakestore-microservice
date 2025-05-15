@@ -9,6 +9,7 @@ import iuh.fit.se.userservice.enums.RoleType;
 import iuh.fit.se.userservice.services.PermissionService;
 import iuh.fit.se.userservice.services.RoleService;
 import iuh.fit.se.userservice.services.UserService;
+import lombok.Builder;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -20,6 +21,7 @@ import java.util.Set;
 
 @EnableConfigurationProperties(RSAKeyRecord.class)
 @SpringBootApplication
+@Builder
 public class AuthenticationServiceApplication {
     public static void main(String[] args) {
         SpringApplication.run(AuthenticationServiceApplication.class, args);
