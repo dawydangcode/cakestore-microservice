@@ -3,19 +3,26 @@ package fit.iuh.edu.vn.product_service.services;
 import fit.iuh.edu.vn.product_service.models.Category;
 import fit.iuh.edu.vn.product_service.models.Product;
 import fit.iuh.edu.vn.product_service.repositories.ProductRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
 public class ProductService {
+
+    private static final Logger logger = LoggerFactory.getLogger(ProductService.class);
 
     @Autowired
     private ProductRepository productRepository;
@@ -24,24 +31,27 @@ public class ProductService {
     private RestTemplate restTemplate;
 
     @Autowired
-    private S3Service s3Service; // Thêm S3Service
+    private S3Service s3Service;
 
-    private static final String CATEGORY_SERVICE_URL = "http://localhost:8080/categories/";
+    private static final String CATEGORY_SERVICE_URL = "http://localhost:8080/categories/"; // Cập nhật port nếu cần
 
+    private final Map<Long, Category> categoryCache = new HashMap<>();
+
+    @Transactional(readOnly = true)
     public List<Product> getAllProducts() {
+        logger.info("Fetching all products");
         List<Product> products = productRepository.findAll();
         for (Product product : products) {
             attachCategoryToProduct(product);
         }
+        logger.info("Returning {} products", products.size());
         return products;
     }
 
     public Product addProduct(Product product, MultipartFile imageFile) throws IOException {
-        // Thiết lập ngày tạo và cập nhật
         product.setCreateAt(LocalDate.now());
         product.setUpdateAt(LocalDate.now());
 
-        // Upload hình ảnh lên S3 nếu có
         if (imageFile != null && !imageFile.isEmpty()) {
             String imageUrl = s3Service.uploadFile(imageFile);
             product.setImage(imageUrl);
@@ -61,7 +71,6 @@ public class ProductService {
             p.setStock(product.getStock());
             p.setUpdateAt(LocalDate.now());
 
-            // Upload hình ảnh mới lên S3 nếu có
             if (imageFile != null && !imageFile.isEmpty()) {
                 String imageUrl = s3Service.uploadFile(imageFile);
                 p.setImage(imageUrl);
@@ -80,6 +89,7 @@ public class ProductService {
         return false;
     }
 
+    @Transactional(readOnly = true)
     public Optional<Product> getProductById(Long id) {
         Optional<Product> productOpt = productRepository.findById(id);
         productOpt.ifPresent(this::attachCategoryToProduct);
@@ -89,16 +99,25 @@ public class ProductService {
     private Product attachCategoryToProduct(Product product) {
         if (product.getCategoryId() != null) {
             try {
-                String url = CATEGORY_SERVICE_URL + product.getCategoryId();
-                System.out.println("Calling Category Service: " + url);
-                Category category = restTemplate.getForObject(url, Category.class);
+                Category category = categoryCache.get(product.getCategoryId());
+                if (category == null) {
+                    String url = CATEGORY_SERVICE_URL + product.getCategoryId();
+                    logger.info("Calling Category Service: {}", url);
+                    category = restTemplate.getForObject(url, Category.class);
+                    if (category != null) {
+                        categoryCache.put(product.getCategoryId(), category);
+                        logger.info("Cached category {}", product.getCategoryId());
+                    }
+                } else {
+                    logger.info("Using cached category {}", product.getCategoryId());
+                }
                 product.setCategory(category);
             } catch (RestClientException e) {
-                System.err.println("Failed to fetch category for product " + product.getId() + ": " + e.getMessage());
+                logger.error("Failed to fetch category for product {}: {}", product.getId(), e.getMessage());
                 product.setCategory(null);
             }
         }
-        return product; // Trả về product đã được gắn category
+        return product;
     }
 
     public void updateProductsCategory(Long categoryId) {
@@ -109,6 +128,7 @@ public class ProductService {
         }
     }
 
+    @Transactional(readOnly = true)
     public List<Product> searchProducts(String keyword) {
         List<Product> products = productRepository.findByNameContainingIgnoreCase(keyword);
         return products.stream()

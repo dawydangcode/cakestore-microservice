@@ -3,6 +3,8 @@ package fit.iuh.edu.vn.product_service.controllers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fit.iuh.edu.vn.product_service.models.Product;
 import fit.iuh.edu.vn.product_service.services.ProductService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -21,6 +23,8 @@ import java.util.Optional;
 @RequestMapping("/products")
 public class ProductController {
 
+    private static final Logger logger = LoggerFactory.getLogger(ProductController.class);
+
     @Autowired
     private ProductService productService;
 
@@ -29,37 +33,56 @@ public class ProductController {
 
     @GetMapping("/list")
     public List<Product> getAllProducts() {
-        return productService.getAllProducts();
+        logger.info("Received request to get all products");
+        List<Product> products = productService.getAllProducts();
+        logger.info("Returning {} products", products.size());
+        return products;
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<List<Product>> searchProducts(@RequestParam(required = false) String keyword) {
+        logger.info("Received search request with keyword: {}", keyword);
+        try {
+            List<Product> products;
+            if (keyword != null && !keyword.trim().isEmpty()) {
+                products = productService.searchProducts(keyword.trim().toLowerCase());
+            } else {
+                products = productService.getAllProducts();
+            }
+            logger.info("Returning {} search results", products.size());
+            return ResponseEntity.ok(products);
+        } catch (Exception e) {
+            logger.error("Error searching products: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+
+    // Các phương thức khác giữ nguyên
     @PostMapping(value = "/add", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Product> addProduct(
             @RequestPart(value = "product", required = true) String productJson,
             @RequestPart(value = "image", required = false) MultipartFile imageFile) {
         try {
-            // Parse chuỗi JSON thành Product
             Product product;
             try {
                 product = objectMapper.readValue(productJson, Product.class);
             } catch (IOException e) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(null);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
             }
-            System.out.println("Parsed product: " + product);
-            System.out.println("Received image: " + (imageFile != null ? imageFile.getOriginalFilename() : "No image"));
+            logger.info("Parsed product: {}", product);
+            logger.info("Received image: {}", (imageFile != null ? imageFile.getOriginalFilename() : "No image"));
 
-            // Lưu sản phẩm
             Product savedProduct = productService.addProduct(product, imageFile);
             return ResponseEntity.ok(savedProduct);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(null);
+            logger.error("Error adding product: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
 
     @PostMapping(value = "/add-json", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Product> addProductJson(@RequestBody Product product) throws IOException {
-        System.out.println("Received product (JSON): " + product);
+        logger.info("Received product (JSON): {}", product);
         Product savedProduct = productService.addProduct(product, null);
         return ResponseEntity.ok(savedProduct);
     }
@@ -70,26 +93,23 @@ public class ProductController {
             @RequestPart(value = "product", required = true) String productJson,
             @RequestPart(value = "image", required = false) MultipartFile imageFile) {
         try {
-            // Parse chuỗi JSON thành Product
             Product product;
             try {
                 product = objectMapper.readValue(productJson, Product.class);
             } catch (IOException e) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(null);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
             }
-            System.out.println("Parsed product for update: " + product);
-            System.out.println("Received image for update: " + (imageFile != null ? imageFile.getOriginalFilename() : "No image"));
+            logger.info("Parsed product for update: {}", product);
+            logger.info("Received image for update: {}", (imageFile != null ? imageFile.getOriginalFilename() : "No image"));
 
-            // Cập nhật sản phẩm
             Product updatedProduct = productService.updateProduct(id, product, imageFile);
             if (updatedProduct != null) {
                 return ResponseEntity.ok(updatedProduct);
             }
             return ResponseEntity.notFound().build();
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(null);
+            logger.error("Error updating product: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
 
@@ -100,21 +120,6 @@ public class ProductController {
             return ResponseEntity.noContent().build();
         }
         return ResponseEntity.notFound().build();
-    }
-
-    @GetMapping("/search")
-    public ResponseEntity<List<Product>> searchProducts(@RequestParam(required = false) String keyword) {
-        try {
-            List<Product> products;
-            if (keyword != null && !keyword.trim().isEmpty()) {
-                products = productService.searchProducts(keyword.trim().toLowerCase());
-            } else {
-                products = productService.getAllProducts();
-            }
-            return ResponseEntity.ok(products);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
-        }
     }
 
     @GetMapping("/{id}")
@@ -147,9 +152,8 @@ public class ProductController {
                 .body("Failed to parse multipart request: " + ex.getMessage() + ". Ensure the request is a valid multipart/form-data with a proper boundary.");
     }
 
-    // Tiện ích để tạo ResponseEntity với body null và message
     private <T> ResponseEntity<T> body(T body, String message) {
-        System.out.println(message);
+        logger.info(message);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 }

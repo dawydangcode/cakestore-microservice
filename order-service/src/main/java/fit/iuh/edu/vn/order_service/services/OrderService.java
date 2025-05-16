@@ -11,6 +11,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders; // Sửa import
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.client.RestClientException;
@@ -32,6 +38,9 @@ public class OrderService {
     @Autowired
     private RestTemplate restTemplate;
 
+    @Autowired
+    private JavaMailSender mailSender;
+
     @Value("${cart.service.url}")
     private String cartServiceUrl;
 
@@ -40,6 +49,9 @@ public class OrderService {
 
     @Value("${product.service.url}")
     private String productServiceUrl;
+
+    @Value("${spring.mail.from}")
+    private String fromEmail;
 
     public Order createOrder(String userName, OrderRequest orderRequest, String token) {
         logger.info("Creating order for user: {}, paymentMethod: {}, status: {}",
@@ -86,6 +98,7 @@ public class OrderService {
             savedOrder.setStatus("Đã thanh toán");
             orderRepository.save(savedOrder);
             clearCart(userName, token);
+            sendOrderConfirmationEmail(savedOrder, userName);
         } else {
             logger.error("Payment failed for orderId: {}", savedOrder.getId());
             savedOrder.setStatus("Thanh toán thất bại");
@@ -162,11 +175,17 @@ public class OrderService {
                     order.getPaymentMethod()
             );
             logger.info("Calling payment-service for orderId: {}", order.getId());
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + token);
+            HttpEntity<PaymentRequest> entity = new HttpEntity<>(paymentRequest, headers);
+
             PaymentResponse response = restTemplate.postForObject(
                     paymentServiceUrl + "/process",
-                    paymentRequest,
+                    entity,
                     PaymentResponse.class
             );
+            logger.info("Payment response: {}", response); // Thêm log để debug
             return response != null && "Thành công".equals(response.getStatus());
         } catch (RestClientException e) {
             logger.error("Payment processing failed: {}", e.getMessage());
@@ -177,11 +196,22 @@ public class OrderService {
     private List<CartItemDTO> fetchCartItems(String userName, String token) {
         try {
             logger.info("Fetching cart items for user: {}", userName);
-            CartItemDTO[] cartItems = restTemplate.getForObject(
+            // Tạo HttpHeaders và thêm token vào header Authorization
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + token);
+
+            // Tạo HttpEntity để chứa header
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+
+            // Gửi yêu cầu với header
+            ResponseEntity<CartItemDTO[]> response = restTemplate.exchange(
                     cartServiceUrl + "/getCartItems",
+                    HttpMethod.GET,
+                    entity,
                     CartItemDTO[].class
             );
-            return List.of(cartItems);
+
+            return List.of(response.getBody());
         } catch (RestClientException e) {
             logger.error("Failed to fetch cart items: {}", e.getMessage());
             throw new RuntimeException("Không thể lấy giỏ hàng: " + e.getMessage());
@@ -192,9 +222,56 @@ public class OrderService {
         List<CartItemDTO> cartItems = fetchCartItems(userName, token);
         for (CartItemDTO item : cartItems) {
             logger.info("Deleting cart item: cartId={}, productId={}", item.getCartId(), item.getProductId());
-            restTemplate.delete(
-                    cartServiceUrl + "/cart/" + item.getCartId() + "/item/" + item.getProductId()
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + token);
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            restTemplate.exchange(
+                    cartServiceUrl + "/cart/" + item.getCartId() + "/item/" + item.getProductId(),
+                    HttpMethod.DELETE,
+                    entity,
+                    Void.class
             );
+        }
+    }
+
+    private void sendOrderConfirmationEmail(Order order, String userName) {
+        String toEmail = userName + "@example.com";
+
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(fromEmail);
+        message.setTo(toEmail);
+        message.setSubject("Xác nhận đơn hàng #" + order.getId() + " - BBang House");
+
+        StringBuilder body = new StringBuilder();
+        body.append("BBang House - Tiệm Bánh & Cafe\n");
+        body.append("Đơn hàng #").append(order.getId()).append("\n");
+        body.append("Cám ơn bạn đã mua hàng!\n");
+        body.append("Xin chào ").append(userName).append(", Chúng tôi đã nhận được đặt hàng của bạn và đã sẵn sàng để vận chuyển. ");
+        body.append("Chúng tôi sẽ thông báo cho bạn khi đơn hàng được gửi đi.\n\n");
+
+        body.append("[Xem đơn hàng](#) hoặc [Đến cửa hàng của chúng tôi](#)\n\n");
+        body.append("Thông tin đơn hàng\n");
+        for (OrderItem item : order.getOrderItems()) {
+            body.append("  ").append(item.getProductName()).append(" × ").append(item.getQuantity()).append("\n");
+            body.append("  ").append(item.getPrice() * item.getQuantity()).append("₫\n");
+        }
+        body.append("Tổng giá trị sản phẩm\n");
+        body.append(order.getTotalPrice()).append("₫\n");
+        body.append("Khuyến mãi\n");
+        body.append("0₫\n");
+        body.append("Phí vận chuyển\n");
+        body.append("80,000₫\n");
+        body.append("Tổng cộng\n");
+        body.append((order.getTotalPrice() + 80000)).append(" VND\n");
+
+        message.setText(body.toString());
+
+        try {
+            logger.info("Sending confirmation email to: {}", toEmail);
+            mailSender.send(message);
+            logger.info("Email sent successfully for orderId: {}", order.getId());
+        } catch (Exception e) {
+            logger.error("Failed to send email for orderId: {}. Error: {}", order.getId(), e.getMessage());
         }
     }
 }
