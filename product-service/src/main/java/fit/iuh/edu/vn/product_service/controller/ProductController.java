@@ -102,6 +102,21 @@ public class ProductController {
         return ResponseEntity.notFound().build();
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<List<Product>> searchProducts(@RequestParam(required = false) String keyword) {
+        try {
+            List<Product> products;
+            if (keyword != null && !keyword.trim().isEmpty()) {
+                products = productService.searchProducts(keyword.trim().toLowerCase());
+            } else {
+                products = productService.getAllProducts();
+            }
+            return ResponseEntity.ok(products);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<Product> getProductById(@PathVariable Long id) {
         Optional<Product> product = productService.getProductById(id);

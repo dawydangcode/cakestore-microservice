@@ -86,7 +86,7 @@ public class ProductService {
         return productOpt;
     }
 
-    private void attachCategoryToProduct(Product product) {
+    private Product attachCategoryToProduct(Product product) {
         if (product.getCategoryId() != null) {
             try {
                 String url = CATEGORY_SERVICE_URL + product.getCategoryId();
@@ -98,6 +98,7 @@ public class ProductService {
                 product.setCategory(null);
             }
         }
+        return product; // Trả về product đã được gắn category
     }
 
     public void updateProductsCategory(Long categoryId) {
@@ -106,5 +107,12 @@ public class ProductService {
             product.setCategoryId(null);
             productRepository.save(product);
         }
+    }
+
+    public List<Product> searchProducts(String keyword) {
+        List<Product> products = productRepository.findByNameContainingIgnoreCase(keyword);
+        return products.stream()
+                .map(this::attachCategoryToProduct)
+                .toList();
     }
 }
