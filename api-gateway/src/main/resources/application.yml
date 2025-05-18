@@ -50,6 +50,14 @@ spring:
           uri: lb://CATEGORY-SERVICE
           predicates:
             - Path=/categories/**
+        - id: chat-service
+          uri: lb://CHAT-SERVICE
+          predicates:
+            - Path=/chat/**
+        - id: chat-websocket
+          uri: lb://CHAT-SERVICE
+          predicates:
+            - Path=/ws/**
       globalcors:
         cors-configurations:
           '[/**]':

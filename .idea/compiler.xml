@@ -32,7 +32,7 @@
         </processorPath>
         <module name="[authenticantion]" />
       </profile>
-      <profile name="Annotation profile for product-service" enabled="true">
+      <profile name="Annotation profile for chat-service" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
@@ -40,6 +40,7 @@
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/unknown/lombok-unknown.jar" />
         </processorPath>
         <module name="product-service" />
+        <module name="chat-service" />
         <module name="order-service" />
       </profile>
     </annotationProcessing>
@@ -58,6 +59,7 @@
       <module name="authentication-service" options="-parameters" />
       <module name="cart-service" options="-parameters" />
       <module name="category-service" options="-parameters" />
+      <module name="chat-service" options="-parameters" />
       <module name="eureka-server" options="-parameters" />
       <module name="homepage-service" options="-parameters" />
       <module name="order-service" options="-parameters" />
