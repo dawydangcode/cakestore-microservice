@@ -1,11 +1,6 @@
 package fit.iuh.edu.vn.product_service.models;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-
 import java.time.LocalDateTime;
 
 @Entity
@@ -21,19 +16,22 @@ public class Review {
     @Column(name = "product_id", nullable = false)
     private Long productId;
 
+    @Column(name = "order_id") // Thêm cột orderId
+    private Long orderId;
+
     @Column(nullable = false)
     private int rating;
 
-    @Column(columnDefinition = "TEXT")
     private String comment;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    // Constructors
+    // Constructor mặc định
     public Review() {
     }
 
+    // Constructor hiện tại (giữ lại để tương thích)
     public Review(String userId, Long productId, int rating, String comment, LocalDateTime createdAt) {
         this.userId = userId;
         this.productId = productId;
@@ -42,7 +40,17 @@ public class Review {
         this.createdAt = createdAt;
     }
 
-    // Getters and Setters
+    // Constructor mới với orderId
+    public Review(String userId, Long productId, Long orderId, int rating, String comment, LocalDateTime createdAt) {
+        this.userId = userId;
+        this.productId = productId;
+        this.orderId = orderId;
+        this.rating = rating;
+        this.comment = comment;
+        this.createdAt = createdAt;
+    }
+
+    // Getters và setters
     public Long getId() {
         return id;
     }
@@ -65,6 +73,14 @@ public class Review {
 
     public void setProductId(Long productId) {
         this.productId = productId;
+    }
+
+    public Long getOrderId() {
+        return orderId;
+    }
+
+    public void setOrderId(Long orderId) {
+        this.orderId = orderId;
     }
 
     public int getRating() {

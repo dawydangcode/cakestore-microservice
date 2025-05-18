@@ -1,4 +1,4 @@
-package fit.iuh.edu.vn.order_service.controller;
+package fit.iuh.edu.vn.order_service.controllers;
 
 import fit.iuh.edu.vn.order_service.dto.OrderRequest;
 import fit.iuh.edu.vn.order_service.dto.OrderResponse;
@@ -57,5 +57,15 @@ public class OrderController {
     public ResponseEntity<Order> updateOrderStatus(@PathVariable Long orderId, @RequestBody StatusUpdateRequest statusUpdate) {
         Order updatedOrder = orderService.updateOrderStatus(orderId, statusUpdate.getStatus());
         return ResponseEntity.ok(updatedOrder);
+    }
+
+    @GetMapping("/by-user")
+    public ResponseEntity<List<Order>> getOrdersByUser(HttpServletRequest request) {
+        String userName = (String) request.getAttribute("userName");
+        if (userName == null) {
+            return ResponseEntity.status(401).body(null);
+        }
+        List<Order> orders = orderService.getOrdersByUser(userName);
+        return ResponseEntity.ok(orders);
     }
 }

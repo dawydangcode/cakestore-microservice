@@ -6,24 +6,27 @@ public class ReviewDTO {
     private Long id;
     private String userId;
     private Long productId;
+    private Long orderId; // Thêm orderId
     private int rating;
     private String comment;
     private LocalDateTime createdAt;
 
-    // Constructors
+    // Constructor mặc định
     public ReviewDTO() {
     }
 
-    public ReviewDTO(Long id, String userId, Long productId, int rating, String comment, LocalDateTime createdAt) {
+    // Constructor đầy đủ
+    public ReviewDTO(Long id, String userId, Long productId, Long orderId, int rating, String comment, LocalDateTime createdAt) {
         this.id = id;
         this.userId = userId;
         this.productId = productId;
+        this.orderId = orderId;
         this.rating = rating;
         this.comment = comment;
         this.createdAt = createdAt;
     }
 
-    // Getters and Setters
+    // Getters và setters
     public Long getId() {
         return id;
     }
@@ -46,6 +49,14 @@ public class ReviewDTO {
 
     public void setProductId(Long productId) {
         this.productId = productId;
+    }
+
+    public Long getOrderId() {
+        return orderId;
+    }
+
+    public void setOrderId(Long orderId) {
+        this.orderId = orderId;
     }
 
     public int getRating() {

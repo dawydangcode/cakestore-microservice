@@ -1,7 +1,6 @@
 package fit.iuh.edu.vn.product_service.services;
 
 import fit.iuh.edu.vn.product_service.dto.OrderDTO;
-import fit.iuh.edu.vn.product_service.dto.OrderItemDTO;
 import fit.iuh.edu.vn.product_service.dto.ReviewDTO;
 import fit.iuh.edu.vn.product_service.models.Review;
 import fit.iuh.edu.vn.product_service.repositories.ReviewRepository;
@@ -34,24 +33,29 @@ public class ReviewService {
     private String orderServiceUrl;
 
     public ReviewDTO addReview(ReviewDTO reviewDTO, String token) {
-        logger.info("Adding review for productId: {} by user: {}", reviewDTO.getProductId(), reviewDTO.getUserId());
+        logger.info("Adding review for productId: {} by user: {} for orderId: {}",
+                reviewDTO.getProductId(), reviewDTO.getUserId(), reviewDTO.getOrderId());
 
-        // Kiểm tra rating hợp lệ
+        // Kiểm tra điểm đánh giá hợp lệ
         if (reviewDTO.getRating() < 1 || reviewDTO.getRating() > 5) {
-            logger.warn("Invalid rating: {}", reviewDTO.getRating());
             throw new IllegalArgumentException("Điểm đánh giá phải từ 1 đến 5");
         }
 
-        // Kiểm tra người dùng đã đánh giá chưa
-        if (reviewRepository.existsByUserIdAndProductId(reviewDTO.getUserId(), reviewDTO.getProductId())) {
-            logger.warn("User {} already reviewed product {}", reviewDTO.getUserId(), reviewDTO.getProductId());
-            throw new IllegalStateException("Bạn đã đánh giá sản phẩm này rồi");
+        // Kiểm tra xem người dùng đã đánh giá cho đơn hàng này chưa
+        if (reviewDTO.getOrderId() != null &&
+                reviewRepository.existsByUserIdAndProductIdAndOrderId(
+                        reviewDTO.getUserId(), reviewDTO.getProductId(), reviewDTO.getOrderId())) {
+            logger.warn("User {} already reviewed product {} for order {}",
+                    reviewDTO.getUserId(), reviewDTO.getProductId(), reviewDTO.getOrderId());
+            throw new IllegalStateException("Bạn đã đánh giá sản phẩm này cho đơn hàng này rồi");
         }
 
-        // Kiểm tra người dùng đã mua sản phẩm
-        boolean hasPurchased = checkUserPurchase(reviewDTO.getUserId(), reviewDTO.getProductId(), token);
+        // Kiểm tra xem người dùng đã mua sản phẩm trong đơn hàng chưa
+        boolean hasPurchased = checkUserPurchase(reviewDTO.getUserId(), reviewDTO.getProductId(),
+                reviewDTO.getOrderId(), token);
         if (!hasPurchased) {
-            logger.warn("User {} has not purchased product {}", reviewDTO.getUserId(), reviewDTO.getProductId());
+            logger.warn("User {} has not purchased product {} in order {}",
+                    reviewDTO.getUserId(), reviewDTO.getProductId(), reviewDTO.getOrderId());
             throw new IllegalStateException("Chỉ người đã mua sản phẩm mới được đánh giá");
         }
 
@@ -59,17 +63,17 @@ public class ReviewService {
         Review review = new Review(
                 reviewDTO.getUserId(),
                 reviewDTO.getProductId(),
+                reviewDTO.getOrderId(), // Lưu orderId
                 reviewDTO.getRating(),
                 reviewDTO.getComment(),
                 LocalDateTime.now()
         );
         Review savedReview = reviewRepository.save(review);
-        logger.info("Review saved for productId: {} by user: {}", savedReview.getProductId(), savedReview.getUserId());
-
         return new ReviewDTO(
                 savedReview.getId(),
                 savedReview.getUserId(),
                 savedReview.getProductId(),
+                savedReview.getOrderId(),
                 savedReview.getRating(),
                 savedReview.getComment(),
                 savedReview.getCreatedAt()
@@ -84,6 +88,7 @@ public class ReviewService {
                         review.getId(),
                         review.getUserId(),
                         review.getProductId(),
+                        review.getOrderId(), // Thêm orderId
                         review.getRating(),
                         review.getComment(),
                         review.getCreatedAt()
@@ -91,35 +96,33 @@ public class ReviewService {
                 .toList();
     }
 
-    private boolean checkUserPurchase(String userId, Long productId, String token) {
+    private boolean checkUserPurchase(String userId, Long productId, Long orderId, String token) {
         try {
-            String url = orderServiceUrl + "/by-user?userName=" + userId;
-            logger.info("Checking purchase history for user: {} at URL: {}", userId, url);
+            String url = orderServiceUrl + "/by-user";
+            logger.info("Kiểm tra lịch sử mua hàng: user={}, productId={}, orderId={}",
+                    userId, productId, orderId);
 
-            // Gửi yêu cầu với token
             HttpHeaders headers = new HttpHeaders();
             headers.set("Authorization", "Bearer " + token);
             HttpEntity<String> entity = new HttpEntity<>(headers);
 
             ResponseEntity<OrderDTO[]> response = restTemplate.exchange(
-                    url,
-                    HttpMethod.GET,
-                    entity,
-                    OrderDTO[].class
+                    url, HttpMethod.GET, entity, OrderDTO[].class
             );
 
             OrderDTO[] orders = response.getBody();
-            if (orders == null) {
-                logger.warn("No orders found for user: {}", userId);
+            if (orders == null || orders.length == 0) {
+                logger.warn("Không tìm thấy đơn hàng cho user: {}", userId);
                 return false;
             }
 
-            // Kiểm tra xem có đơn hàng nào chứa productId
             return Arrays.stream(orders)
+                    .filter(order -> orderId == null || order.getId().equals(orderId))
                     .flatMap(order -> order.getOrderItems().stream())
-                    .anyMatch(item -> item.getProductId().equals(productId));
+                    .anyMatch(item -> String.valueOf(item.getProductId()).equals(String.valueOf(productId)));
         } catch (Exception e) {
-            logger.error("Failed to check purchase history for user: {}. Error: {}", userId, e.getMessage());
+            logger.error("Lỗi kiểm tra lịch sử mua hàng: user={}, orderId={}, lỗi: {}",
+                    userId, orderId, e.getMessage(), e);
             return false;
         }
     }
