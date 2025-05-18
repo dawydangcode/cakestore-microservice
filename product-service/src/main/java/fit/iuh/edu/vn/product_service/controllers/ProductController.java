@@ -1,8 +1,11 @@
 package fit.iuh.edu.vn.product_service.controllers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import fit.iuh.edu.vn.product_service.dto.ReviewDTO;
 import fit.iuh.edu.vn.product_service.models.Product;
 import fit.iuh.edu.vn.product_service.services.ProductService;
+import fit.iuh.edu.vn.product_service.services.ReviewService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +19,7 @@ import org.springframework.web.multipart.support.MissingServletRequestPartExcept
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,6 +31,9 @@ public class ProductController {
 
     @Autowired
     private ProductService productService;
+
+    @Autowired
+    private ReviewService reviewService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -132,6 +139,44 @@ public class ProductController {
     public ResponseEntity<Void> updateProductsCategory(@PathVariable Long categoryId) {
         productService.updateProductsCategory(categoryId);
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/reviews")
+    public ResponseEntity<?> addReview(@RequestBody ReviewDTO reviewDTO, HttpServletRequest request) {
+        logger.info("Received POST /products/reviews for productId: {}", reviewDTO.getProductId());
+        String userName = (String) request.getAttribute("userName");
+        String token = request.getHeader("Authorization").replace("Bearer ", "");
+
+        if (userName == null) {
+            logger.warn("Unauthorized: Invalid token");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid token");
+        }
+
+        try {
+            reviewDTO.setUserId(userName);
+            ReviewDTO savedReview = reviewService.addReview(reviewDTO, token);
+            logger.info("Review added successfully for productId: {} by user: {}", reviewDTO.getProductId(), userName);
+            return ResponseEntity.ok(savedReview);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            logger.warn("Failed to add review: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            logger.error("Error adding review: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Lỗi server");
+        }
+    }
+
+    @GetMapping("/reviews/product/{productId}")
+    public ResponseEntity<List<ReviewDTO>> getReviewsByProductId(@PathVariable Long productId) {
+        logger.info("Processing GET /products/reviews/product/{} at {}", productId, LocalDateTime.now());
+        try {
+            List<ReviewDTO> reviews = reviewService.getReviewsByProductId(productId);
+            logger.info("Returning {} reviews for productId: {}", reviews.size(), productId);
+            return ResponseEntity.ok(reviews);
+        } catch (Exception e) {
+            logger.error("Error fetching reviews: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
     }
 
     @ExceptionHandler(MissingServletRequestPartException.class)

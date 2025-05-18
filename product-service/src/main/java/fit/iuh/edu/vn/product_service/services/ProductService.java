@@ -7,7 +7,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.multipart.MultipartFile;
@@ -33,18 +32,16 @@ public class ProductService {
     @Autowired
     private S3Service s3Service;
 
-    private static final String CATEGORY_SERVICE_URL = "http://localhost:8080/categories/"; // Cập nhật port nếu cần
+    private static final String CATEGORY_SERVICE_URL = "http://localhost:8080/categories/";
 
+    // Cache để lưu trữ Category đã gọi
     private final Map<Long, Category> categoryCache = new HashMap<>();
 
-    @Transactional(readOnly = true)
     public List<Product> getAllProducts() {
-        logger.info("Fetching all products");
         List<Product> products = productRepository.findAll();
         for (Product product : products) {
             attachCategoryToProduct(product);
         }
-        logger.info("Returning {} products", products.size());
         return products;
     }
 
@@ -89,7 +86,6 @@ public class ProductService {
         return false;
     }
 
-    @Transactional(readOnly = true)
     public Optional<Product> getProductById(Long id) {
         Optional<Product> productOpt = productRepository.findById(id);
         productOpt.ifPresent(this::attachCategoryToProduct);
@@ -106,10 +102,7 @@ public class ProductService {
                     category = restTemplate.getForObject(url, Category.class);
                     if (category != null) {
                         categoryCache.put(product.getCategoryId(), category);
-                        logger.info("Cached category {}", product.getCategoryId());
                     }
-                } else {
-                    logger.info("Using cached category {}", product.getCategoryId());
                 }
                 product.setCategory(category);
             } catch (RestClientException e) {
@@ -128,7 +121,6 @@ public class ProductService {
         }
     }
 
-    @Transactional(readOnly = true)
     public List<Product> searchProducts(String keyword) {
         List<Product> products = productRepository.findByNameContainingIgnoreCase(keyword);
         return products.stream()
