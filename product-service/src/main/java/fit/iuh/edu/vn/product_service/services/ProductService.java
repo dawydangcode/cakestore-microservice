@@ -214,18 +214,28 @@ public class ProductService {
         Optional<Product> productOpt = productRepository.findById(id);
         if (productOpt.isPresent()) {
             Product product = productOpt.get();
-            // Chỉ khôi phục nếu stock > 0
-            if (product.getStock() != null && product.getStock() > 0) {
-                product.setStatus("ACTIVE");
-                product.setUpdateAt(LocalDate.now());
-                productRepository.save(product);
-                logger.info("Product {} restored to ACTIVE", product.getName());
-                return true;
-            } else {
-                logger.warn("Cannot restore product {}: Stock is 0", id);
-                throw new IllegalArgumentException("Cannot restore product: Stock is 0");
+            if (product.getStock() != null && product.getStock() == 0) {
+                product.setStock(1);
+                logger.info("Product {} stock set to 1 during restore", product.getName());
             }
+            product.setStatus("ACTIVE");
+            product.setUpdateAt(LocalDate.now());
+            productRepository.save(product);
+            logger.info("Product {} restored to ACTIVE with stock {}", product.getName(), product.getStock());
+            return true;
         }
+        logger.warn("Product with id {} not found", id);
+        return false;
+    }
+
+    public boolean deleteProduct(Long id) {
+        Optional<Product> productOpt = productRepository.findById(id);
+        if (productOpt.isPresent()) {
+            productRepository.delete(productOpt.get());
+            logger.info("Product with id {} deleted successfully", id);
+            return true;
+        }
+        logger.warn("Product with id {} not found", id);
         return false;
     }
 }

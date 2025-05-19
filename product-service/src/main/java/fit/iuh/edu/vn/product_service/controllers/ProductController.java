@@ -190,9 +190,9 @@ public class ProductController {
             }
             logger.warn("Product with id {} not found", id);
             return ResponseEntity.notFound().build();
-        } catch (IllegalArgumentException e) {
-            logger.warn("Failed to restore product {}: {}", id, e.getMessage());
-            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            logger.error("Failed to restore product {}: {}", id, e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Lỗi khi khôi phục sản phẩm: " + e.getMessage());
         }
     }
 
