@@ -1,4 +1,4 @@
-package fit.iuh.edu.vn.chat_service.controller;
+package fit.iuh.edu.vn.chat_service.controllers;
 
 import fit.iuh.edu.vn.chat_service.models.ChatMessage;
 import fit.iuh.edu.vn.chat_service.repositories.ChatMessageRepository;
@@ -29,5 +29,10 @@ public class ChatController {
     @GetMapping("/chat/history")
     public List<ChatMessage> getChatHistory(@RequestParam String userName) {
         return chatMessageRepository.findByUserNameOrderByCreatedAtAsc(userName);
+    }
+
+    @GetMapping("/chat/users")
+    public List<String> getChatUsers() {
+        return chatMessageRepository.findDistinctUserNames();
     }
 }
