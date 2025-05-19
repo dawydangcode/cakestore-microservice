@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -31,6 +32,29 @@ public class CartService {
         if (userName == null) {
             throw new IllegalArgumentException("userName cannot be null");
         }
+        // Kiểm tra trạng thái và tồn kho sản phẩm trước khi thêm
+        try {
+            String productUrl = PRODUCT_SERVICE_URL + productId;
+            Map<String, Object> product = restTemplate.getForObject(productUrl, Map.class);
+            if (product != null) {
+                String status = (String) product.get("status");
+                Integer stock = (Integer) product.get("stock");
+                if (!"ACTIVE".equals(status)) {
+                    throw new IllegalArgumentException("Sản phẩm đã bị ẩn và không thể thêm vào giỏ hàng.");
+                }
+                if (stock == null || stock <= 0) {
+                    throw new IllegalArgumentException("Sản phẩm đã hết hàng.");
+                }
+                if (stock < quantity) {
+                    throw new IllegalArgumentException("Số lượng yêu cầu vượt quá tồn kho.");
+                }
+            } else {
+                throw new IllegalArgumentException("Không tìm thấy sản phẩm.");
+            }
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Lỗi khi kiểm tra sản phẩm: " + e.getMessage());
+        }
+
         Optional<Cart> optionalCart = Optional.ofNullable(cartRepository.findByUserName(userName));
         Cart cart;
         if (optionalCart.isPresent()) {
@@ -66,20 +90,41 @@ public class CartService {
         Optional<Cart> optionalCart = Optional.ofNullable(cartRepository.findByUserName(userName));
         if (optionalCart.isPresent()) {
             List<CartItem> cartItems = cartItemRepository.findByCartId(optionalCart.get().getId());
-            // Fetch thông tin sản phẩm từ product-service
+            List<CartItem> validItems = new ArrayList<>();
+            List<Long> itemsToRemove = new ArrayList<>();
+
+            // Kiểm tra trạng thái sản phẩm
             for (CartItem item : cartItems) {
                 try {
                     String productUrl = PRODUCT_SERVICE_URL + item.getProductId();
                     Map<String, Object> product = restTemplate.getForObject(productUrl, Map.class);
                     if (product != null) {
-                        item.setName((String) product.get("name"));
-                        item.setImage((String) product.get("image"));
+                        String status = (String) product.get("status");
+                        if ("ACTIVE".equals(status)) {
+                            item.setName((String) product.get("name"));
+                            item.setImage((String) product.get("image"));
+                            validItems.add(item);
+                        } else {
+                            itemsToRemove.add(item.getProductId());
+                        }
+                    } else {
+                        itemsToRemove.add(item.getProductId());
                     }
                 } catch (Exception e) {
                     System.err.println("Failed to fetch product info for productId " + item.getProductId() + ": " + e.getMessage());
+                    itemsToRemove.add(item.getProductId());
                 }
             }
-            return cartItems;
+
+            // Xóa các sản phẩm không hợp lệ
+            for (Long productId : itemsToRemove) {
+                CartItem item = cartItemRepository.findByCartIdAndProductId(optionalCart.get().getId(), productId);
+                if (item != null) {
+                    cartItemRepository.delete(item);
+                }
+            }
+
+            return validItems;
         }
         return List.of();
     }
@@ -111,6 +156,21 @@ public class CartService {
     public void increaseItemQuantity(Long cartId, Long productId, int amount) {
         CartItem cartItem = cartItemRepository.findByCartIdAndProductId(cartId, productId);
         if (cartItem != null) {
+            // Kiểm tra tồn kho trước khi tăng số lượng
+            try {
+                String productUrl = PRODUCT_SERVICE_URL + productId;
+                Map<String, Object> product = restTemplate.getForObject(productUrl, Map.class);
+                if (product != null) {
+                    Integer stock = (Integer) product.get("stock");
+                    if (stock == null || stock < cartItem.getQuantity() + amount) {
+                        throw new IllegalArgumentException("Số lượng yêu cầu vượt quá tồn kho.");
+                    }
+                } else {
+                    throw new IllegalArgumentException("Không tìm thấy sản phẩm.");
+                }
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Lỗi khi kiểm tra sản phẩm: " + e.getMessage());
+            }
             cartItem.setQuantity(cartItem.getQuantity() + amount);
             cartItemRepository.save(cartItem);
         } else {

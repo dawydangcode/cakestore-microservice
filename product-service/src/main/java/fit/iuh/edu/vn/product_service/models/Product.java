@@ -57,7 +57,11 @@ public class Product {
 
     @Column(name = "is_best_seller")
     @JsonProperty("isBestSeller")
-    private boolean isBestSeller = false;
+    private Boolean isBestSeller = false;
+
+    @Column(name = "status", nullable = false)
+    @JsonProperty("status")
+    private String status = "ACTIVE"; // Thêm thuộc tính status
 
     @Transient
     @JsonProperty("category")
@@ -144,11 +148,19 @@ public class Product {
         this.image = image;
     }
 
-    public boolean isBestSeller() {
+    public Boolean isBestSeller() {
         return isBestSeller;
     }
 
-    public void setBestSeller(boolean bestSeller) {
+    public void setBestSeller(Boolean bestSeller) {
         isBestSeller = bestSeller;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 }

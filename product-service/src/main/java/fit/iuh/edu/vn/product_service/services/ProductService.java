@@ -37,9 +37,12 @@ public class ProductService {
     private final Map<Long, Category> categoryCache = new HashMap<>();
 
     public List<Product> getAllProducts() {
-        List<Product> products = productRepository.findAll();
+        List<Product> products = productRepository.findByStatus("ACTIVE");
         for (Product product : products) {
             attachCategoryToProduct(product);
+            if (product.isBestSeller() == null) {
+                product.setBestSeller(false);
+            }
         }
         return products;
     }
@@ -48,6 +51,9 @@ public class ProductService {
         List<Product> bestSellers = productRepository.findByIsBestSellerTrue();
         for (Product product : bestSellers) {
             attachCategoryToProduct(product);
+            if (product.isBestSeller() == null) {
+                product.setBestSeller(false);
+            }
         }
         return bestSellers;
     }
@@ -78,6 +84,17 @@ public class ProductService {
     public Product addProduct(Product product, MultipartFile imageFile) throws IOException {
         product.setCreateAt(LocalDate.now());
         product.setUpdateAt(LocalDate.now());
+        if (product.isBestSeller() == null) {
+            product.setBestSeller(false);
+        }
+        if (product.getStatus() == null) {
+            product.setStatus("ACTIVE");
+        }
+        // Tự động ẩn nếu stock <= 0
+        if (product.getStock() != null && product.getStock() <= 0) {
+            product.setStatus("INACTIVE");
+            logger.info("Product {} set to INACTIVE due to stock <= 0", product.getName());
+        }
 
         if (imageFile != null && !imageFile.isEmpty()) {
             String imageUrl = s3Service.uploadFile(imageFile);
@@ -96,8 +113,16 @@ public class ProductService {
             p.setDescription(product.getDescription());
             p.setPrice(product.getPrice());
             p.setStock(product.getStock());
-            p.setBestSeller(product.isBestSeller());
+            p.setBestSeller(product.isBestSeller() != null ? product.isBestSeller() : false);
             p.setUpdateAt(LocalDate.now());
+            // Tự động ẩn hoặc khôi phục dựa trên stock
+            if (product.getStock() != null && product.getStock() <= 0) {
+                p.setStatus("INACTIVE");
+                logger.info("Product {} set to INACTIVE due to stock <= 0", p.getName());
+            } else if (product.getStock() != null && product.getStock() > 0 && p.getStatus().equals("INACTIVE")) {
+                p.setStatus("ACTIVE");
+                logger.info("Product {} restored to ACTIVE due to stock > 0", p.getName());
+            }
 
             if (imageFile != null && !imageFile.isEmpty()) {
                 String imageUrl = s3Service.uploadFile(imageFile);
@@ -109,9 +134,13 @@ public class ProductService {
         return null;
     }
 
-    public boolean deleteProduct(Long id) {
-        if (productRepository.existsById(id)) {
-            productRepository.deleteById(id);
+    public boolean hideProduct(Long id) {
+        Optional<Product> productOpt = productRepository.findById(id);
+        if (productOpt.isPresent()) {
+            Product product = productOpt.get();
+            product.setStatus("INACTIVE");
+            product.setUpdateAt(LocalDate.now());
+            productRepository.save(product);
             return true;
         }
         return false;
@@ -119,7 +148,12 @@ public class ProductService {
 
     public Optional<Product> getProductById(Long id) {
         Optional<Product> productOpt = productRepository.findById(id);
-        productOpt.ifPresent(this::attachCategoryToProduct);
+        productOpt.ifPresent(product -> {
+            attachCategoryToProduct(product);
+            if (product.isBestSeller() == null) {
+                product.setBestSeller(false);
+            }
+        });
         return productOpt;
     }
 
@@ -145,7 +179,7 @@ public class ProductService {
     }
 
     public void updateProductsCategory(Long categoryId) {
-        List<Product> products = productRepository.findByCategoryId(categoryId);
+        List<Product> products = productRepository.findByCategoryIdAndStatus(categoryId, "ACTIVE");
         for (Product product : products) {
             product.setCategoryId(null);
             productRepository.save(product);
@@ -153,9 +187,45 @@ public class ProductService {
     }
 
     public List<Product> searchProducts(String keyword) {
-        List<Product> products = productRepository.findByNameContainingIgnoreCase(keyword);
+        List<Product> products = productRepository.findByNameContainingIgnoreCaseAndStatus(keyword, "ACTIVE");
         return products.stream()
-                .map(this::attachCategoryToProduct)
+                .map(product -> {
+                    attachCategoryToProduct(product);
+                    if (product.isBestSeller() == null) {
+                        product.setBestSeller(false);
+                    }
+                    return product;
+                })
                 .toList();
+    }
+
+    public List<Product> getInactiveProducts() {
+        List<Product> products = productRepository.findByStatus("INACTIVE");
+        for (Product product : products) {
+            attachCategoryToProduct(product);
+            if (product.isBestSeller() == null) {
+                product.setBestSeller(false);
+            }
+        }
+        return products;
+    }
+
+    public boolean restoreProduct(Long id) {
+        Optional<Product> productOpt = productRepository.findById(id);
+        if (productOpt.isPresent()) {
+            Product product = productOpt.get();
+            // Chỉ khôi phục nếu stock > 0
+            if (product.getStock() != null && product.getStock() > 0) {
+                product.setStatus("ACTIVE");
+                product.setUpdateAt(LocalDate.now());
+                productRepository.save(product);
+                logger.info("Product {} restored to ACTIVE", product.getName());
+                return true;
+            } else {
+                logger.warn("Cannot restore product {}: Stock is 0", id);
+                throw new IllegalArgumentException("Cannot restore product: Stock is 0");
+            }
+        }
+        return false;
     }
 }
