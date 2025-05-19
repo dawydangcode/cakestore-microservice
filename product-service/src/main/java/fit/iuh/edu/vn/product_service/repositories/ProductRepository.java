@@ -10,4 +10,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     List<Product> findByCategoryId(Long categoryId);
     @Query("SELECT p FROM Product p WHERE LOWER(p.name) LIKE %:keyword%")
     List<Product> findByNameContainingIgnoreCase(String keyword);
+    List<Product> findByIsBestSellerTrue();
+    long countByIsBestSellerTrue();
 }

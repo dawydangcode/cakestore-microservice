@@ -55,11 +55,15 @@ public class Product {
     @JsonProperty("image")
     private String image;
 
+    @Column(name = "is_best_seller")
+    @JsonProperty("isBestSeller")
+    private boolean isBestSeller = false;
+
     @Transient
     @JsonProperty("category")
-    private Category category; // Sử dụng class Category từ package models
+    private Category category;
 
-
+    // Getters and Setters
     public Long getId() {
         return id;
     }
@@ -138,5 +142,13 @@ public class Product {
 
     public void setImage(String image) {
         this.image = image;
+    }
+
+    public boolean isBestSeller() {
+        return isBestSeller;
+    }
+
+    public void setBestSeller(boolean bestSeller) {
+        isBestSeller = bestSeller;
     }
 }

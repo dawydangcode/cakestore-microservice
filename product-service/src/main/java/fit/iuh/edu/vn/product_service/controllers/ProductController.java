@@ -46,6 +46,24 @@ public class ProductController {
         return products;
     }
 
+    @GetMapping("/bestsellers")
+    public ResponseEntity<List<Product>> getBestSellers() {
+        logger.info("Received request to get best sellers");
+        List<Product> bestSellers = productService.getBestSellers();
+        logger.info("Returning {} best sellers", bestSellers.size());
+        return ResponseEntity.ok(bestSellers);
+    }
+
+    @PutMapping("/bestseller/{id}")
+    public ResponseEntity<String> setBestSeller(@PathVariable Long id, @RequestParam boolean isBestSeller) {
+        logger.info("Received request to set product {} as best seller: {}", id, isBestSeller);
+        boolean success = productService.setBestSeller(id, isBestSeller);
+        if (success) {
+            return ResponseEntity.ok("Cập nhật trạng thái Best Seller thành công");
+        }
+        return ResponseEntity.badRequest().body("Không thể cập nhật trạng thái Best Seller. Có thể đã đạt giới hạn 8 sản phẩm hoặc sản phẩm không tồn tại.");
+    }
+
     @GetMapping("/search")
     public ResponseEntity<List<Product>> searchProducts(@RequestParam(required = false) String keyword) {
         logger.info("Received search request with keyword: {}", keyword);
@@ -64,7 +82,6 @@ public class ProductController {
         }
     }
 
-    // Các phương thức khác giữ nguyên
     @PostMapping(value = "/add", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Product> addProduct(
             @RequestPart(value = "product", required = true) String productJson,

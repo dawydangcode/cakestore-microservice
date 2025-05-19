@@ -50,14 +50,6 @@ spring:
           uri: lb://CATEGORY-SERVICE
           predicates:
             - Path=/categories/**
-        - id: chat-service
-          uri: lb://CHAT-SERVICE
-          predicates:
-            - Path=/chat/**
-        - id: chat-websocket
-          uri: lb://CHAT-SERVICE
-          predicates:
-            - Path=/ws/**
       globalcors:
         cors-configurations:
           '[/**]':
@@ -71,7 +63,6 @@ spring:
             allowedHeaders: "*"
             allowCredentials: true
             maxAge: 3600
-
 eureka:
   client:
     service-url:
@@ -82,3 +73,4 @@ eureka:
 logging:
   level:
     org.springframework.cloud.gateway: DEBUG
+    org.springframework.web: DEBUG

@@ -34,7 +34,6 @@ public class ProductService {
 
     private static final String CATEGORY_SERVICE_URL = "http://localhost:8080/categories/";
 
-    // Cache để lưu trữ Category đã gọi
     private final Map<Long, Category> categoryCache = new HashMap<>();
 
     public List<Product> getAllProducts() {
@@ -43,6 +42,37 @@ public class ProductService {
             attachCategoryToProduct(product);
         }
         return products;
+    }
+
+    public List<Product> getBestSellers() {
+        List<Product> bestSellers = productRepository.findByIsBestSellerTrue();
+        for (Product product : bestSellers) {
+            attachCategoryToProduct(product);
+        }
+        return bestSellers;
+    }
+
+    public boolean setBestSeller(Long id, boolean isBestSeller) {
+        Optional<Product> productOpt = productRepository.findById(id);
+        if (productOpt.isPresent()) {
+            if (isBestSeller) {
+                long currentBestSellers = productRepository.countByIsBestSellerTrue();
+                if (currentBestSellers >= 8) {
+                    logger.warn("Cannot set product {} as Best Seller: Limit of 8 reached", id);
+                    return false;
+                }
+            }
+            Product product = productOpt.get();
+            product.setBestSeller(isBestSeller);
+            product.setUpdateAt(LocalDate.now());
+            productRepository.save(product);
+            return true;
+        }
+        return false;
+    }
+
+    public long countBestSellers() {
+        return productRepository.countByIsBestSellerTrue();
     }
 
     public Product addProduct(Product product, MultipartFile imageFile) throws IOException {
@@ -66,6 +96,7 @@ public class ProductService {
             p.setDescription(product.getDescription());
             p.setPrice(product.getPrice());
             p.setStock(product.getStock());
+            p.setBestSeller(product.isBestSeller());
             p.setUpdateAt(LocalDate.now());
 
             if (imageFile != null && !imageFile.isEmpty()) {
