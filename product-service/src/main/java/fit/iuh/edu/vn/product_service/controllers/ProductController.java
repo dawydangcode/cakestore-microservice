@@ -19,8 +19,10 @@ import org.springframework.web.multipart.support.MissingServletRequestPartExcept
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -238,6 +240,38 @@ public class ProductController {
         } catch (Exception e) {
             logger.error("Error adding review: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Lỗi server");
+        }
+    }
+
+    @PutMapping("/update-stock/{id}")
+    public ResponseEntity<Product> updateProductStock(@PathVariable Long id, @RequestBody Map<String, Integer> stockUpdate) {
+        logger.info("Received PUT /products/update-stock/{} at {}", id, LocalDateTime.now());
+        try {
+            if (!stockUpdate.containsKey("stock") || stockUpdate.get("stock") == null) {
+                logger.error("Invalid stock value provided for product {}", id);
+                return ResponseEntity.badRequest().body(null);
+            }
+            Optional<Product> existingProduct = productService.getProductById(id);
+            if (existingProduct.isPresent()) {
+                Product p = existingProduct.get();
+                p.setStock(stockUpdate.get("stock"));
+                p.setUpdateAt(LocalDate.now());
+                if (p.getStock() <= 0) {
+                    p.setStatus("INACTIVE");
+                    logger.info("Product {} set to INACTIVE due to stock <= 0", p.getName());
+                } else if (p.getStock() > 0 && p.getStatus().equals("INACTIVE")) {
+                    p.setStatus("ACTIVE");
+                    logger.info("Product {} restored to ACTIVE due to stock > 0", p.getName());
+                }
+                Product updatedProduct = productService.updateProduct(id, p, null);
+                logger.info("Product stock updated successfully: {} with stock {}", updatedProduct.getName(), updatedProduct.getStock());
+                return ResponseEntity.ok(updatedProduct);
+            }
+            logger.warn("Product with id {} not found", id);
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            logger.error("Error updating product stock: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
 

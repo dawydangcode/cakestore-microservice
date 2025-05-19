@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders; // Sửa import
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mail.SimpleMailMessage;
@@ -63,6 +63,32 @@ public class OrderService {
             throw new IllegalStateException("Giỏ hàng trống, không thể tạo đơn hàng");
         }
 
+        // Kiểm tra stock trước khi tạo đơn hàng
+        for (CartItemDTO item : cartItems) {
+            try {
+                String productUrl = productServiceUrl + "/" + item.getProductId();
+                HttpHeaders headers = new HttpHeaders();
+                headers.set("Authorization", "Bearer " + token);
+                HttpEntity<String> entity = new HttpEntity<>(headers);
+                ResponseEntity<Map> productResponse = restTemplate.exchange(
+                        productUrl, HttpMethod.GET, entity, Map.class);
+                Map<String, Object> product = productResponse.getBody();
+                if (product == null || !product.containsKey("stock")) {
+                    logger.error("Product {} not found or missing stock", item.getProductId());
+                    throw new IllegalStateException("Sản phẩm " + item.getProductId() + " không tồn tại");
+                }
+                Integer stock = (Integer) product.get("stock");
+                if (stock == null || stock < item.getQuantity()) {
+                    logger.error("Insufficient stock for product {}: required {}, available {}",
+                            item.getProductId(), item.getQuantity(), stock);
+                    throw new IllegalStateException("Sản phẩm " + product.get("name") + " không đủ tồn kho");
+                }
+            } catch (RestClientException e) {
+                logger.error("Failed to fetch product {}: {}", item.getProductId(), e.getMessage());
+                throw new RuntimeException("Không thể kiểm tra tồn kho sản phẩm: " + e.getMessage());
+            }
+        }
+
         float totalPrice = cartItems.stream()
                 .map(item -> item.getPrice() * item.getQuantity())
                 .reduce(0f, Float::sum);
@@ -94,9 +120,47 @@ public class OrderService {
 
         Boolean paymentSuccess = processPayment(userName, savedOrder, token);
         if (paymentSuccess != null && paymentSuccess) {
-            logger.info("Payment successful, updating order status and clearing cart for user: {}", userName);
+            logger.info("Payment successful, updating order status and processing stock for user: {}", userName);
             savedOrder.setStatus("Đã thanh toán");
             orderRepository.save(savedOrder);
+
+            // Cập nhật stock sản phẩm
+            for (OrderItem item : savedOrder.getOrderItems()) {
+                try {
+                    String productUrl = productServiceUrl + "/update-stock/" + item.getProductId();
+                    HttpHeaders headers = new HttpHeaders();
+                    headers.set("Authorization", "Bearer " + token);
+                    headers.set("Content-Type", "application/json");
+
+                    // Lấy thông tin sản phẩm hiện tại
+                    ResponseEntity<Map> productResponse = restTemplate.exchange(
+                            productServiceUrl + "/" + item.getProductId(),
+                            HttpMethod.GET,
+                            new HttpEntity<>(headers),
+                            Map.class);
+                    Map<String, Object> product = productResponse.getBody();
+                    if (product == null) {
+                        logger.error("Product {} not found during stock update", item.getProductId());
+                        throw new RuntimeException("Sản phẩm " + item.getProductId() + " không tồn tại");
+                    }
+
+                    // Tạo payload với stock mới
+                    int newStock = ((Integer) product.get("stock")) - item.getQuantity();
+                    Map<String, Integer> stockUpdate = Map.of("stock", newStock);
+
+                    // Gửi yêu cầu cập nhật stock
+                    HttpEntity<Map<String, Integer>> entity = new HttpEntity<>(stockUpdate, headers);
+                    ResponseEntity<Map> updateResponse = restTemplate.exchange(
+                            productUrl, HttpMethod.PUT, entity, Map.class);
+                    logger.info("Updated stock for product {}: new stock = {}", item.getProductId(), newStock);
+                } catch (RestClientException e) {
+                    logger.error("Failed to update stock for product {}: {}", item.getProductId(), e.getMessage());
+                    savedOrder.setStatus("Thanh toán thành công nhưng cập nhật tồn kho thất bại");
+                    orderRepository.save(savedOrder);
+                    throw new RuntimeException("Cập nhật tồn kho thất bại cho sản phẩm " + item.getProductId());
+                }
+            }
+
             clearCart(userName, token);
             sendOrderConfirmationEmail(savedOrder, userName);
         } else {
@@ -185,7 +249,7 @@ public class OrderService {
                     entity,
                     PaymentResponse.class
             );
-            logger.info("Payment response: {}", response); // Thêm log để debug
+            logger.info("Payment response: {}", response);
             return response != null && "Thành công".equals(response.getStatus());
         } catch (RestClientException e) {
             logger.error("Payment processing failed: {}", e.getMessage());
@@ -196,21 +260,15 @@ public class OrderService {
     private List<CartItemDTO> fetchCartItems(String userName, String token) {
         try {
             logger.info("Fetching cart items for user: {}", userName);
-            // Tạo HttpHeaders và thêm token vào header Authorization
             HttpHeaders headers = new HttpHeaders();
             headers.set("Authorization", "Bearer " + token);
-
-            // Tạo HttpEntity để chứa header
             HttpEntity<String> entity = new HttpEntity<>(headers);
-
-            // Gửi yêu cầu với header
             ResponseEntity<CartItemDTO[]> response = restTemplate.exchange(
                     cartServiceUrl + "/getCartItems",
                     HttpMethod.GET,
                     entity,
                     CartItemDTO[].class
             );
-
             return List.of(response.getBody());
         } catch (RestClientException e) {
             logger.error("Failed to fetch cart items: {}", e.getMessage());
@@ -248,7 +306,6 @@ public class OrderService {
         body.append("Cám ơn bạn đã mua hàng!\n");
         body.append("Xin chào ").append(userName).append(", Chúng tôi đã nhận được đặt hàng của bạn và đã sẵn sàng để vận chuyển. ");
         body.append("Chúng tôi sẽ thông báo cho bạn khi đơn hàng được gửi đi.\n\n");
-
         body.append("[Xem đơn hàng](#) hoặc [Đến cửa hàng của chúng tôi](#)\n\n");
         body.append("Thông tin đơn hàng\n");
         for (OrderItem item : order.getOrderItems()) {
