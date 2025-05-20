@@ -30,6 +30,7 @@ public class OrderController {
         }
         token = token.replace("Bearer ", "");
 
+        // Gọi createOrder và trả về phản hồi ngay sau khi xóa giỏ hàng
         Order order = orderService.createOrder(userName, orderRequest, token);
         OrderResponse response = new OrderResponse(order);
         return ResponseEntity.ok(response);
@@ -37,13 +38,13 @@ public class OrderController {
 
     @GetMapping("/user/{userName}")
     public ResponseEntity<List<Order>> getOrdersByUser(@PathVariable String userName) {
-        List<Order> orders = orderService.getOrdersByUser(userName); // Giả định phương thức này
+        List<Order> orders = orderService.getOrdersByUser(userName);
         return ResponseEntity.ok(orders);
     }
 
     @GetMapping("/{orderId}")
     public ResponseEntity<Order> getOrderById(@PathVariable Long orderId) {
-        Order order = orderService.getOrderById(orderId); // Giả định phương thức này
+        Order order = orderService.getOrderById(orderId);
         return ResponseEntity.ok(order);
     }
 

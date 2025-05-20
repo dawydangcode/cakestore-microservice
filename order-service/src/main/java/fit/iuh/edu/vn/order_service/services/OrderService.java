@@ -15,8 +15,6 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.client.RestClientException;
@@ -39,7 +37,7 @@ public class OrderService {
     private RestTemplate restTemplate;
 
     @Autowired
-    private JavaMailSender mailSender;
+    private EmailService emailService;
 
     @Value("${cart.service.url}")
     private String cartServiceUrl;
@@ -50,21 +48,26 @@ public class OrderService {
     @Value("${product.service.url}")
     private String productServiceUrl;
 
-    @Value("${spring.mail.from}")
-    private String fromEmail;
-
     public Order createOrder(String userName, OrderRequest orderRequest, String token) {
-        logger.info("Creating order for user: {}, paymentMethod: {}, status: {}",
+        long startTotal = System.currentTimeMillis();
+        logger.info("Starting order creation for user: {}, paymentMethod: {}, status: {}",
                 userName, orderRequest.getPaymentMethod(), "Chờ thanh toán");
 
+        // Step 1: Fetch Cart Items
+        long startFetchCart = System.currentTimeMillis();
         List<CartItemDTO> cartItems = fetchCartItems(userName, token);
+        long durationFetchCart = System.currentTimeMillis() - startFetchCart;
+        logger.debug("Fetched {} cart items in {} ms", cartItems.size(), durationFetchCart);
 
         if (cartItems.isEmpty()) {
+            logger.error("Cart is empty, cannot create order");
             throw new IllegalStateException("Giỏ hàng trống, không thể tạo đơn hàng");
         }
 
-        // Kiểm tra stock trước khi tạo đơn hàng
+        // Step 2: Check Stock
+        long startCheckStock = System.currentTimeMillis();
         for (CartItemDTO item : cartItems) {
+            long startProductFetch = System.currentTimeMillis();
             try {
                 String productUrl = productServiceUrl + "/" + item.getProductId();
                 HttpHeaders headers = new HttpHeaders();
@@ -86,9 +89,16 @@ public class OrderService {
             } catch (RestClientException e) {
                 logger.error("Failed to fetch product {}: {}", item.getProductId(), e.getMessage());
                 throw new RuntimeException("Không thể kiểm tra tồn kho sản phẩm: " + e.getMessage());
+            } finally {
+                long durationProductFetch = System.currentTimeMillis() - startProductFetch;
+                logger.debug("Checked stock for product {} in {} ms", item.getProductId(), durationProductFetch);
             }
         }
+        long durationCheckStock = System.currentTimeMillis() - startCheckStock;
+        logger.debug("Completed stock check for {} items in {} ms", cartItems.size(), durationCheckStock);
 
+        // Step 3: Calculate Total and Create Order
+        long startCreateOrder = System.currentTimeMillis();
         float totalPrice = cartItems.stream()
                 .map(item -> item.getPrice() * item.getQuantity())
                 .reduce(0f, Float::sum);
@@ -97,6 +107,7 @@ public class OrderService {
         order.setUserName(userName);
         order.setFullName(orderRequest.getFullName());
         order.setPhoneNumber(orderRequest.getPhoneNumber());
+        order.setEmail(orderRequest.getEmail()); // Set email từ OrderRequest
         order.setDistrict(orderRequest.getDistrict());
         order.setAddress(orderRequest.getAddress());
         order.setTotalPrice(totalPrice);
@@ -117,15 +128,24 @@ public class OrderService {
 
         logger.info("Saving order: {}", order);
         Order savedOrder = orderRepository.save(order);
+        long durationCreateOrder = System.currentTimeMillis() - startCreateOrder;
+        logger.debug("Created and saved order in {} ms", durationCreateOrder);
 
+        // Step 4: Process Payment
+        long startPayment = System.currentTimeMillis();
         Boolean paymentSuccess = processPayment(userName, savedOrder, token);
+        long durationPayment = System.currentTimeMillis() - startPayment;
+        logger.debug("Processed payment in {} ms, success: {}", durationPayment, paymentSuccess);
+
         if (paymentSuccess != null && paymentSuccess) {
             logger.info("Payment successful, updating order status and processing stock for user: {}", userName);
             savedOrder.setStatus("Đã thanh toán");
             orderRepository.save(savedOrder);
 
-            // Cập nhật stock sản phẩm
+            // Step 5: Update Stock
+            long startUpdateStock = System.currentTimeMillis();
             for (OrderItem item : savedOrder.getOrderItems()) {
+                long startStockUpdate = System.currentTimeMillis();
                 try {
                     String productUrl = productServiceUrl + "/update-stock/" + item.getProductId();
                     HttpHeaders headers = new HttpHeaders();
@@ -158,19 +178,39 @@ public class OrderService {
                     savedOrder.setStatus("Thanh toán thành công nhưng cập nhật tồn kho thất bại");
                     orderRepository.save(savedOrder);
                     throw new RuntimeException("Cập nhật tồn kho thất bại cho sản phẩm " + item.getProductId());
+                } finally {
+                    long durationStockUpdate = System.currentTimeMillis() - startStockUpdate;
+                    logger.debug("Updated stock for product {} in {} ms", item.getProductId(), durationStockUpdate);
                 }
             }
+            long durationUpdateStock = System.currentTimeMillis() - startUpdateStock;
+            logger.debug("Completed stock update for {} items in {} ms", savedOrder.getOrderItems().size(), durationUpdateStock);
 
+            // Step 6: Clear Cart
+            long startClearCart = System.currentTimeMillis();
             clearCart(userName, token);
-            sendOrderConfirmationEmail(savedOrder, userName);
+            long durationClearCart = System.currentTimeMillis() - startClearCart;
+            logger.debug("Cleared cart in {} ms", durationClearCart);
+
+            // Trả về order ngay sau khi xóa giỏ hàng
+            long durationUntilClearCart = System.currentTimeMillis() - startTotal;
+            logger.info("Order creation completed up to cart clearing for orderId: {} in {} ms", savedOrder.getId(), durationUntilClearCart);
+
+            // Step 7: Send Confirmation Email (Async)
+            try {
+                emailService.sendOrderConfirmationEmail(savedOrder, userName);
+                logger.debug("Triggered async email sending for orderId: {}", savedOrder.getId());
+            } catch (Exception e) {
+                logger.error("Failed to trigger async email for orderId: {}. Error: {}", savedOrder.getId(), e.getMessage());
+            }
+
+            return savedOrder;
         } else {
             logger.error("Payment failed for orderId: {}", savedOrder.getId());
             savedOrder.setStatus("Thanh toán thất bại");
             orderRepository.save(savedOrder);
             throw new RuntimeException("Thanh toán thất bại");
         }
-
-        return savedOrder;
     }
 
     public List<Order> getOrdersByUser(String userName) {
@@ -232,6 +272,7 @@ public class OrderService {
     }
 
     private Boolean processPayment(String userName, Order order, String token) {
+        long startPayment = System.currentTimeMillis();
         try {
             PaymentRequest paymentRequest = new PaymentRequest(
                     order.getId(),
@@ -250,14 +291,19 @@ public class OrderService {
                     PaymentResponse.class
             );
             logger.info("Payment response: {}", response);
+            long durationPayment = System.currentTimeMillis() - startPayment;
+            logger.debug("Payment service call took {} ms", durationPayment);
             return response != null && "Thành công".equals(response.getStatus());
         } catch (RestClientException e) {
             logger.error("Payment processing failed: {}", e.getMessage());
+            long durationPayment = System.currentTimeMillis() - startPayment;
+            logger.debug("Payment service call failed after {} ms", durationPayment);
             return false;
         }
     }
 
     private List<CartItemDTO> fetchCartItems(String userName, String token) {
+        long startFetch = System.currentTimeMillis();
         try {
             logger.info("Fetching cart items for user: {}", userName);
             HttpHeaders headers = new HttpHeaders();
@@ -269,66 +315,44 @@ public class OrderService {
                     entity,
                     CartItemDTO[].class
             );
-            return List.of(response.getBody());
+            List<CartItemDTO> cartItems = List.of(response.getBody());
+            long durationFetch = System.currentTimeMillis() - startFetch;
+            logger.debug("Cart service call took {} ms, returned {} items", durationFetch, cartItems.size());
+            return cartItems;
         } catch (RestClientException e) {
             logger.error("Failed to fetch cart items: {}", e.getMessage());
+            long durationFetch = System.currentTimeMillis() - startFetch;
+            logger.debug("Cart service call failed after {} ms", durationFetch);
             throw new RuntimeException("Không thể lấy giỏ hàng: " + e.getMessage());
         }
     }
 
     private void clearCart(String userName, String token) {
+        long startClear = System.currentTimeMillis();
         List<CartItemDTO> cartItems = fetchCartItems(userName, token);
         for (CartItemDTO item : cartItems) {
+            long startDelete = System.currentTimeMillis();
             logger.info("Deleting cart item: cartId={}, productId={}", item.getCartId(), item.getProductId());
             HttpHeaders headers = new HttpHeaders();
             headers.set("Authorization", "Bearer " + token);
             HttpEntity<String> entity = new HttpEntity<>(headers);
-            restTemplate.exchange(
-                    cartServiceUrl + "/cart/" + item.getCartId() + "/item/" + item.getProductId(),
-                    HttpMethod.DELETE,
-                    entity,
-                    Void.class
-            );
+            try {
+                restTemplate.exchange(
+                        cartServiceUrl + "/cart/" + item.getCartId() + "/item/" + item.getProductId(),
+                        HttpMethod.DELETE,
+                        entity,
+                        Void.class
+                );
+            } catch (RestClientException e) {
+                logger.error("Failed to delete cart item cartId={}, productId={}: {}",
+                        item.getCartId(), item.getProductId(), e.getMessage());
+            } finally {
+                long durationDelete = System.currentTimeMillis() - startDelete;
+                logger.debug("Deleted cart item cartId={}, productId={} in {} ms",
+                        item.getCartId(), item.getProductId(), durationDelete);
+            }
         }
-    }
-
-    private void sendOrderConfirmationEmail(Order order, String userName) {
-        String toEmail = userName + "@example.com";
-
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(fromEmail);
-        message.setTo(toEmail);
-        message.setSubject("Xác nhận đơn hàng #" + order.getId() + " - BBang House");
-
-        StringBuilder body = new StringBuilder();
-        body.append("BBang House - Tiệm Bánh & Cafe\n");
-        body.append("Đơn hàng #").append(order.getId()).append("\n");
-        body.append("Cám ơn bạn đã mua hàng!\n");
-        body.append("Xin chào ").append(userName).append(", Chúng tôi đã nhận được đặt hàng của bạn và đã sẵn sàng để vận chuyển. ");
-        body.append("Chúng tôi sẽ thông báo cho bạn khi đơn hàng được gửi đi.\n\n");
-        body.append("[Xem đơn hàng](#) hoặc [Đến cửa hàng của chúng tôi](#)\n\n");
-        body.append("Thông tin đơn hàng\n");
-        for (OrderItem item : order.getOrderItems()) {
-            body.append("  ").append(item.getProductName()).append(" × ").append(item.getQuantity()).append("\n");
-            body.append("  ").append(item.getPrice() * item.getQuantity()).append("₫\n");
-        }
-        body.append("Tổng giá trị sản phẩm\n");
-        body.append(order.getTotalPrice()).append("₫\n");
-        body.append("Khuyến mãi\n");
-        body.append("0₫\n");
-        body.append("Phí vận chuyển\n");
-        body.append("80,000₫\n");
-        body.append("Tổng cộng\n");
-        body.append((order.getTotalPrice() + 80000)).append(" VND\n");
-
-        message.setText(body.toString());
-
-        try {
-            logger.info("Sending confirmation email to: {}", toEmail);
-            mailSender.send(message);
-            logger.info("Email sent successfully for orderId: {}", order.getId());
-        } catch (Exception e) {
-            logger.error("Failed to send email for orderId: {}. Error: {}", order.getId(), e.getMessage());
-        }
+        long durationClear = System.currentTimeMillis() - startClear;
+        logger.debug("Completed cart clearing for {} items in {} ms", cartItems.size(), durationClear);
     }
 }

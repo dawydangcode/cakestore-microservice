@@ -42,6 +42,10 @@ public class Order {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "email", nullable = false)
+    private String email;
+
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     @JsonManagedReference
     private List<OrderItem> orderItems = new ArrayList<>();
@@ -138,5 +142,13 @@ public class Order {
     public void setOrderItems(List<OrderItem> orderItems) {
         this.orderItems.clear();
         this.orderItems.addAll(orderItems);
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
     }
 }
