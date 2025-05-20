@@ -30,10 +30,10 @@ public class EmailService {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(fromEmail);
         message.setTo(toEmail);
-        message.setSubject("Xác nhận đơn hàng #" + order.getId() + " - BBang House");
+        message.setSubject("Xác nhận đơn hàng #" + order.getId() + " - IUH Bake");
 
         StringBuilder body = new StringBuilder();
-        body.append("BBang House - Tiệm Bánh & Cafe\n");
+        body.append("IUH Bake - Tiệm Bánh & Cafe\n");
         body.append("Đơn hàng #").append(order.getId()).append("\n");
         body.append("Cám ơn bạn đã mua hàng!\n");
         body.append("Xin chào ").append(userName).append(", Chúng tôi đã nhận được đặt hàng của bạn và đã sẵn sàng để vận chuyển. ");
@@ -49,9 +49,9 @@ public class EmailService {
         body.append("Khuyến mãi\n");
         body.append("0₫\n");
         body.append("Phí vận chuyển\n");
-        body.append("80,000₫\n");
+        body.append("40,000₫\n");
         body.append("Tổng cộng\n");
-        body.append((order.getTotalPrice() + 80000)).append(" VND\n");
+        body.append((order.getTotalPrice() + 40000)).append("đ\n");
 
         message.setText(body.toString());
 
