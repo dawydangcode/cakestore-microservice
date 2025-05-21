@@ -22,33 +22,27 @@ public class PaymentService {
         logger.info("Processing payment for user: {}, orderId: {}, paymentMethod: {}",
                 userName, paymentRequest.getOrderId(), paymentRequest.getPaymentMethod());
 
-        // Giả lập xử lý thanh toán
-        boolean paymentSuccess = processPaymentLogic(paymentRequest);
-
         Payment payment = new Payment();
         payment.setOrderId(paymentRequest.getOrderId());
         payment.setUserName(userName);
         payment.setAmount(paymentRequest.getAmount());
         payment.setPaymentMethod(paymentRequest.getPaymentMethod());
-        payment.setStatus(paymentSuccess ? "Thành công" : "Thất bại");
         payment.setCreatedAt(LocalDateTime.now());
+
+        if ("COD".equals(paymentRequest.getPaymentMethod())) {
+            logger.info("COD payment processed successfully for orderId: {}", paymentRequest.getOrderId());
+            payment.setStatus("Thành công");
+        } else if ("BANK".equals(paymentRequest.getPaymentMethod())) {
+            logger.info("BANK payment initiated for orderId: {}. Awaiting PayOS confirmation.", paymentRequest.getOrderId());
+            payment.setStatus("Chờ xác nhận");
+        } else {
+            logger.error("Invalid payment method: {}", paymentRequest.getPaymentMethod());
+            payment.setStatus("Thất bại");
+            paymentRepository.save(payment);
+            throw new IllegalArgumentException("Phương thức thanh toán không hợp lệ");
+        }
 
         logger.info("Saving payment: {}", payment);
         return paymentRepository.save(payment);
-    }
-
-    private boolean processPaymentLogic(PaymentRequest paymentRequest) {
-        // Hiện tại hỗ trợ COD, giả lập cho BANK
-        if ("COD".equals(paymentRequest.getPaymentMethod())) {
-            logger.info("COD payment processed successfully for orderId: {}", paymentRequest.getOrderId());
-            return true;
-        } else if ("BANK".equals(paymentRequest.getPaymentMethod())) {
-            // Giả lập thanh toán ngân hàng (tích hợp sau)
-            logger.info("BANK payment simulation for orderId: {}", paymentRequest.getOrderId());
-            return true; // Thay bằng logic thật (Stripe, VNPay,...)
-        } else {
-            logger.error("Invalid payment method: {}", paymentRequest.getPaymentMethod());
-            throw new IllegalArgumentException("Phương thức thanh toán không hợp lệ");
-        }
     }
 }

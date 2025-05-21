@@ -20,6 +20,7 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/orders/webhook").permitAll() // Cho phép truy cập webhook không cần xác thực
                         .requestMatchers("/orders/**").authenticated() // Chỉ yêu cầu token hợp lệ
                         .anyRequest().permitAll()
                 )

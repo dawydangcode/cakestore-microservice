@@ -7,20 +7,24 @@ import fit.iuh.edu.vn.order_service.dto.PaymentResponse;
 import fit.iuh.edu.vn.order_service.models.Order;
 import fit.iuh.edu.vn.order_service.models.OrderItem;
 import fit.iuh.edu.vn.order_service.repositories.OrderRepository;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.client.RestClientException;
+import vn.payos.PayOS;
+import vn.payos.type.CheckoutResponseData;
+import vn.payos.type.ItemData;
+import vn.payos.type.PaymentData;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -48,10 +52,33 @@ public class OrderService {
     @Value("${product.service.url}")
     private String productServiceUrl;
 
+    @Value("${payos.client-id}")
+    private String payosClientId;
+
+    @Value("${payos.api-key}")
+    private String payosApiKey;
+
+    @Value("${payos.checksum-key}")
+    private String payosChecksumKey;
+
+    @Value("${payos.return-url}")
+    private String payosReturnUrl;
+
+    @Value("${payos.cancel-url}")
+    private String payosCancelUrl;
+
+    @Autowired
+    private PayOS payOS;
+
+    @PostConstruct
+    public void init() {
+        this.payOS = new PayOS(payosClientId, payosApiKey, payosChecksumKey);
+    }
+
     public Order createOrder(String userName, OrderRequest orderRequest, String token) {
         long startTotal = System.currentTimeMillis();
-        logger.info("Starting order creation for user: {}, paymentMethod: {}, status: {}",
-                userName, orderRequest.getPaymentMethod(), "Chờ thanh toán");
+        logger.info("Starting order creation for user: {}, paymentMethod: {}, status: Chờ thanh toán",
+                userName, orderRequest.getPaymentMethod());
 
         // Step 1: Fetch Cart Items
         long startFetchCart = System.currentTimeMillis();
@@ -107,11 +134,11 @@ public class OrderService {
         order.setUserName(userName);
         order.setFullName(orderRequest.getFullName());
         order.setPhoneNumber(orderRequest.getPhoneNumber());
-        order.setEmail(orderRequest.getEmail()); // Set email từ OrderRequest
+        order.setEmail(orderRequest.getEmail());
         order.setDistrict(orderRequest.getDistrict());
         order.setAddress(orderRequest.getAddress());
-        order.setTotalPrice(totalPrice);
-        order.setStatus("Chờ thanh toán");
+        order.setTotalPrice(totalPrice + 0); // Adding shipping fee
+        order.setStatus("Chờ thanh toán"); // Always set to "Chờ thanh toán" initially
         order.setPaymentMethod(orderRequest.getPaymentMethod());
         order.setCreatedAt(LocalDateTime.now());
 
@@ -133,12 +160,12 @@ public class OrderService {
 
         // Step 4: Process Payment
         long startPayment = System.currentTimeMillis();
-        Boolean paymentSuccess = processPayment(userName, savedOrder, token);
+        Boolean paymentInitiated = processPayment(userName, savedOrder, token);
         long durationPayment = System.currentTimeMillis() - startPayment;
-        logger.debug("Processed payment in {} ms, success: {}", durationPayment, paymentSuccess);
+        logger.debug("Processed payment in {} ms, initiated: {}", durationPayment, paymentInitiated);
 
-        if (paymentSuccess != null && paymentSuccess) {
-            logger.info("Payment successful, updating order status and processing stock for user: {}", userName);
+        if (paymentInitiated != null && paymentInitiated && "COD".equals(savedOrder.getPaymentMethod())) {
+            logger.info("COD payment successful, updating order status and processing stock for user: {}", userName);
             savedOrder.setStatus("Đã thanh toán");
             orderRepository.save(savedOrder);
 
@@ -152,7 +179,6 @@ public class OrderService {
                     headers.set("Authorization", "Bearer " + token);
                     headers.set("Content-Type", "application/json");
 
-                    // Lấy thông tin sản phẩm hiện tại
                     ResponseEntity<Map> productResponse = restTemplate.exchange(
                             productServiceUrl + "/" + item.getProductId(),
                             HttpMethod.GET,
@@ -164,11 +190,9 @@ public class OrderService {
                         throw new RuntimeException("Sản phẩm " + item.getProductId() + " không tồn tại");
                     }
 
-                    // Tạo payload với stock mới
                     int newStock = ((Integer) product.get("stock")) - item.getQuantity();
                     Map<String, Integer> stockUpdate = Map.of("stock", newStock);
 
-                    // Gửi yêu cầu cập nhật stock
                     HttpEntity<Map<String, Integer>> entity = new HttpEntity<>(stockUpdate, headers);
                     ResponseEntity<Map> updateResponse = restTemplate.exchange(
                             productUrl, HttpMethod.PUT, entity, Map.class);
@@ -192,25 +216,39 @@ public class OrderService {
             long durationClearCart = System.currentTimeMillis() - startClearCart;
             logger.debug("Cleared cart in {} ms", durationClearCart);
 
-            // Trả về order ngay sau khi xóa giỏ hàng
             long durationUntilClearCart = System.currentTimeMillis() - startTotal;
             logger.info("Order creation completed up to cart clearing for orderId: {} in {} ms", savedOrder.getId(), durationUntilClearCart);
 
-            // Step 7: Send Confirmation Email (Async)
             try {
                 emailService.sendOrderConfirmationEmail(savedOrder, userName);
                 logger.debug("Triggered async email sending for orderId: {}", savedOrder.getId());
             } catch (Exception e) {
                 logger.error("Failed to trigger async email for orderId: {}. Error: {}", savedOrder.getId(), e.getMessage());
             }
-
-            return savedOrder;
+        } else if ("BANK".equals(savedOrder.getPaymentMethod())) {
+            logger.info("BANK payment initiated for orderId: {}. Awaiting PayOS confirmation.", savedOrder.getId());
+            // Do not update status to "Đã thanh toán" here; wait for webhook
         } else {
             logger.error("Payment failed for orderId: {}", savedOrder.getId());
             savedOrder.setStatus("Thanh toán thất bại");
             orderRepository.save(savedOrder);
             throw new RuntimeException("Thanh toán thất bại");
         }
+
+        return savedOrder;
+    }
+
+    @Scheduled(fixedRate = 60000) // Run every minute
+    public void checkPendingOrders() {
+        logger.info("Checking for pending orders older than 10 minutes");
+        LocalDateTime tenMinutesAgo = LocalDateTime.now().minusMinutes(10);
+        List<Order> pendingOrders = orderRepository.findByStatusAndCreatedAtBefore("Chờ thanh toán", tenMinutesAgo);
+        for (Order order : pendingOrders) {
+            logger.info("Order {} has been pending for over 10 minutes, updating to Thanh toán thất bại", order.getId());
+            order.setStatus("Thanh toán thất bại");
+            orderRepository.save(order);
+        }
+        logger.info("Processed {} pending orders", pendingOrders.size());
     }
 
     public List<Order> getOrdersByUser(String userName) {
@@ -293,7 +331,8 @@ public class OrderService {
             logger.info("Payment response: {}", response);
             long durationPayment = System.currentTimeMillis() - startPayment;
             logger.debug("Payment service call took {} ms", durationPayment);
-            return response != null && "Thành công".equals(response.getStatus());
+            return response != null && ("Thành công".equals(response.getStatus()) ||
+                    ("Chờ xác nhận".equals(response.getStatus()) && "BANK".equals(order.getPaymentMethod())));
         } catch (RestClientException e) {
             logger.error("Payment processing failed: {}", e.getMessage());
             long durationPayment = System.currentTimeMillis() - startPayment;
@@ -327,7 +366,7 @@ public class OrderService {
         }
     }
 
-    private void clearCart(String userName, String token) {
+    public void clearCart(String userName, String token) {
         long startClear = System.currentTimeMillis();
         List<CartItemDTO> cartItems = fetchCartItems(userName, token);
         for (CartItemDTO item : cartItems) {
@@ -354,5 +393,59 @@ public class OrderService {
         }
         long durationClear = System.currentTimeMillis() - startClear;
         logger.debug("Completed cart clearing for {} items in {} ms", cartItems.size(), durationClear);
+    }
+
+    public String generatePaymentLink(String orderId, float amount) {
+        try {
+            logger.info("Generating payment link for orderId: {}", orderId);
+            String timestampSuffix = String.format("%03d", System.currentTimeMillis() % 1000);
+            logger.info("Timestamp suffix: {}", timestampSuffix);
+            String orderCodeStr = orderId + timestampSuffix;
+            logger.info("Constructed orderCode string: {}", orderCodeStr);
+            long orderCode = Long.parseLong(orderCodeStr);
+            logger.info("Final orderCode: {}", orderCode);
+
+            Order order = orderRepository.findById(Long.parseLong(orderId))
+                    .orElseThrow(() -> new RuntimeException("Order not found with id: " + orderId));
+            order.setOrderCode(orderCode); // Lưu orderCode
+            orderRepository.save(order);
+            logger.info("Saved orderCode: {} for orderId: {}", orderCode, orderId);
+
+            List<ItemData> items = new ArrayList<>();
+            for (OrderItem item : order.getOrderItems()) {
+                items.add(ItemData.builder()
+                        .name(item.getProductName() != null ? item.getProductName() : "Sản phẩm #" + item.getProductId())
+                        .quantity(item.getQuantity())
+                        .price((int) item.getPrice())
+                        .build());
+            }
+
+            PaymentData paymentData = PaymentData.builder()
+                    .orderCode(orderCode)
+                    .amount((int) amount)
+                    .description("Thanh toán đơn hàng #" + orderId)
+                    .returnUrl(payosReturnUrl)
+                    .cancelUrl(payosCancelUrl)
+                    .items(items)
+                    .build();
+
+            CheckoutResponseData result = payOS.createPaymentLink(paymentData);
+            logger.info("Generated PayOS payment link for orderId: {}, orderCode: {}, checkoutUrl: {}",
+                    orderId, orderCode, result.getCheckoutUrl());
+            return result.getCheckoutUrl();
+        } catch (Exception e) {
+            logger.error("Failed to generate PayOS payment link for orderId: {}: {}", orderId, e.getMessage());
+            throw new RuntimeException("Không thể tạo link thanh toán PayOS: " + e.getMessage());
+        }
+    }
+
+    public Order getOrderByOrderCode(Long orderCode) {
+        logger.info("Fetching order by orderCode: {}", orderCode);
+        Order order = orderRepository.findByOrderCode(orderCode);
+        if (order == null) {
+            logger.error("Order not found with orderCode: {}", orderCode);
+            throw new RuntimeException("Order not found with orderCode: " + orderCode);
+        }
+        return enrichOrdersWithProductNames(List.of(order)).get(0);
     }
 }

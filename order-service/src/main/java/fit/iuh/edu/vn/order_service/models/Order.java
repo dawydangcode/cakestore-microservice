@@ -45,6 +45,8 @@ public class Order {
     @Column(name = "email", nullable = false)
     private String email;
 
+    @Column(name = "order_code")
+    private Long orderCode;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     @JsonManagedReference
@@ -150,5 +152,13 @@ public class Order {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public Long getOrderCode() {
+        return orderCode;
+    }
+
+    public void setOrderCode(Long orderCode) {
+        this.orderCode = orderCode;
     }
 }

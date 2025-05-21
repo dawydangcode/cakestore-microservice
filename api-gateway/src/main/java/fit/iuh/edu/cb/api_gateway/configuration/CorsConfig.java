@@ -1,4 +1,5 @@
 package fit.iuh.edu.cb.api_gateway.configuration;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
@@ -42,19 +43,30 @@ public class CorsConfig {
             // Xử lý yêu cầu preflight (OPTIONS)
             if (request.getMethod() == HttpMethod.OPTIONS) {
                 logger.debug("Handling OPTIONS preflight request for {}", request.getURI());
-                response.getHeaders().set(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "http://localhost:3000");
-                response.getHeaders().set(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, "GET, POST, PUT, DELETE, OPTIONS");
-                response.getHeaders().set(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, "*");
-                response.getHeaders().set(HttpHeaders.ACCESS_CONTROL_MAX_AGE, "3600");
-                response.getHeaders().set(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true");
+                if (request.getURI().getPath().equals("/orders/webhook")) {
+                    response.getHeaders().set(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*");
+                    response.getHeaders().set(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, "POST, OPTIONS");
+                    response.getHeaders().set(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, "*");
+                    response.getHeaders().set(HttpHeaders.ACCESS_CONTROL_MAX_AGE, "3600");
+                } else {
+                    response.getHeaders().set(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "http://localhost:3000");
+                    response.getHeaders().set(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, "GET, POST, PUT, DELETE, OPTIONS");
+                    response.getHeaders().set(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, "*");
+                    response.getHeaders().set(HttpHeaders.ACCESS_CONTROL_MAX_AGE, "3600");
+                    response.getHeaders().set(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true");
+                }
                 response.setStatusCode(HttpStatus.OK);
                 return Mono.empty();
             }
 
             // Thêm header CORS cho các yêu cầu khác
             logger.debug("Adding CORS headers to response for {}", request.getURI());
-            response.getHeaders().set(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "http://localhost:3000");
-            response.getHeaders().set(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true");
+            if (request.getURI().getPath().equals("/orders/webhook")) {
+                response.getHeaders().set(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*");
+            } else {
+                response.getHeaders().set(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "http://localhost:3000");
+                response.getHeaders().set(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true");
+            }
 
             return chain.filter(exchange);
         }

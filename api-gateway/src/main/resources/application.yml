@@ -50,6 +50,7 @@ spring:
           uri: lb://CATEGORY-SERVICE
           predicates:
             - Path=/categories/**
+
       globalcors:
         cors-configurations:
           '[/**]':
