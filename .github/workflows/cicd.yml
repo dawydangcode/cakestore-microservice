@@ -1,0 +1,105 @@
+name: CI/CD Pipeline for CakeStore Microservices
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      # Bước 1: Checkout mã nguồn
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Bước 2: Thiết lập JDK 17
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # Bước 3: Cài đặt Maven và build/test từng microservice
+      - name: Build and test Eureka Server
+        run: mvn clean test -f eureka-server/pom.xml
+      - name: Build and test API Gateway
+        run: mvn clean test -f api-gateway/pom.xml
+      - name: Build and test Order Service
+        run: mvn clean test -f order-service/pom.xml
+      - name: Build and test Cart Service
+        run: mvn clean test -f cart-service/pom.xml
+      - name: Build and test Authentication Service
+        run: mvn clean test -f authentication-service/pom.xml
+
+  build-and-push-docker:
+    runs-on: ubuntu-latest
+    needs: build-and-test  # Chỉ chạy nếu build-and-test thành công
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'  # Chỉ chạy khi push lên main
+    steps:
+      # Bước 1: Checkout mã nguồn
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Bước 2: Thiết lập JDK 17
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # Bước 3: Build JAR files
+      - name: Build JAR files
+        run: |
+          mvn clean package -DskipTests -f eureka-server/pom.xml
+          mvn clean package -DskipTests -f api-gateway/pom.xml
+          mvn clean package -DskipTests -f order-service/pom.xml
+          mvn clean package -DskipTests -f cart-service/pom.xml
+          mvn clean package -DskipTests -f authentication-service/pom.xml
+
+      # Bước 4: Thiết lập Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      # Bước 5: Đăng nhập vào Docker Hub
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Bước 6: Build và đẩy Docker images
+      - name: Build and push Docker images
+        run: |
+          docker build -t yourusername/cakestore-eureka:latest -f eureka-server/Dockerfile eureka-server
+          docker build -t yourusername/cakestore-gateway:latest -f api-gateway/Dockerfile api-gateway
+          docker build -t yourusername/cakestore-order:latest -f order-service/Dockerfile order-service
+          docker build -t yourusername/cakestore-cart:latest -f cart-service/Dockerfile cart-service
+          docker build -t yourusername/cakestore-auth:latest -f authentication-service/Dockerfile authentication-service
+          docker push yourusername/cakestore-eureka:latest
+          docker push yourusername/cakestore-gateway:latest
+          docker push yourusername/cakestore-order:latest
+          docker push yourusername/cakestore-cart:latest
+          docker push yourusername/cakestore-auth:latest
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push-docker  # Chỉ chạy nếu build-and-push-docker thành công
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'  # Chỉ chạy khi push lên main
+    steps:
+      # Bước 1: Checkout mã nguồn
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Bước 2: SSH vào VPS và triển khai
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            docker-compose -f /path/to/docker-compose.yml down
+            docker-compose -f /path/to/docker-compose.yml pull
+            docker-compose -f /path/to/docker-compose.yml up -d
